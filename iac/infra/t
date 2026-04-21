@@ -1,0 +1,44 @@
+resource "null_resource" "wait_for_cluster" {
+  depends_on = [module.eks]
+
+  provisioner "local-exec" {
+    command = "aws eks wait cluster-active --name ${module.eks.cluster_name}"
+  }
+}
+
+resource "null_resource" "wait_for_nodes" {
+  depends_on = [module.eks]
+
+  provisioner "local-exec" {
+    command = <<EOT
+kubectl wait --for=condition=Ready nodes --all --timeout=300s
+EOT
+  }
+}
+
+resource "null_resource" "wait_for_cluster_empty" {
+  depends_on = [
+    # your k8s layer destroy trigger (later)
+  ]
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<EOT
+echo "Waiting for pods to terminate..."
+kubectl wait --for=delete pod --all --all-namespaces --timeout=300s || true
+EOT
+  }
+}
+
+resource "null_resource" "wait_for_efs_csi" {
+  depends_on = [helm_release.efs_csi]
+
+  provisioner "local-exec" {
+    command = <<EOT
+kubectl wait --for=condition=Available deployment efs-csi-controller -n kube-system --timeout=300s
+EOT
+  }
+}
+
+
+

@@ -1,0 +1,15 @@
+name: Environment Test
+
+on:
+  push: {}
+  workflow_dispatch:
+
+jobs:
+  test-production-env:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Trigger environment
+        run: echo "Activating production environment"
+

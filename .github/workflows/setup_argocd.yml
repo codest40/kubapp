@@ -1,0 +1,88 @@
+name: Argocd Setup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      # --------------------------------
+      # 1. Checkout repo
+      # --------------------------------
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # --------------------------------
+      # 2. AWS credentials
+      # --------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure AWS credentials
+        run: |
+          set -e
+          STATUS=$(kubectl get configmap cluster-readiness -n kube-system -o jsonpath='{.data.status}' 2>/dev/null || echo "notready")
+
+          if [ "$STATUS" != "ready" ]; then
+            echo "❌ Cluster not ready"
+            exit 1
+          fi
+
+          echo "Cluster ready → proceeding with GitOps"
+
+      # --------------------------------
+      # 3. Setup kubeconfig (EKS access)
+      # --------------------------------
+      - name: Setup kubeconfig
+        run: |
+          set -e
+
+          aws eks update-kubeconfig \
+            --region ${{ secrets.AWS_REGION }} \
+            --name kubapp-dev
+
+          export KUBECONFIG=~/.kube/config
+
+          echo "✅ kubeconfig created"
+
+          kubectl cluster-info
+
+      - name: Check
+        run: |
+          set -e
+          echo "=== kubeconfig ==="
+          cat ~/.kube/config || true
+          echo "=== auth test ==="
+          kubectl auth can-i get pods -A || true
+
+      # --------------------------------
+      # 4. Apply ArgoCD GitHub App repo secret
+      # --------------------------------
+      - name: Apply ArgoCD GitHub App secret
+        run: |
+          set -e
+
+          if [ -f gitops/argocd/github-repo-secret.yaml ]; then
+            kubectl apply --validate=false -f gitops/argocd/github-repo-secret.yaml
+            echo "ArgoCD secret applied from file"
+          else
+            echo "Generating secret"
+            python3 scripts/argo_secret.py
+            kubectl apply --validate=false -f gitops/argocd/github-repo-secret.yaml
+          fi
+
+      # --------------------------------
+      # 5. Verify ArgoCD resources
+      # --------------------------------
+      - name: Verify ArgoCD namespace access
+        run: kubectl get ns argocd
+
+      - name: Verify secret exists
+        run: kubectl get secret -n argocd | grep github || true

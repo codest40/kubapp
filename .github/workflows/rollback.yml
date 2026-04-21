@@ -1,0 +1,25 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit SHA to rollback"
+        required: true
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Revert commit safely
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git revert ${{ github.event.inputs.commit }} --no-edit
+          git push origin main
+

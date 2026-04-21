@@ -1,0 +1,31 @@
+name: GitOps Bootstrap
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Run Prechecks
+        run: bash scripts/prechecks.sh
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID_GITHUB }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY_GITHUB }}
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Make script executable
+        run: chmod +x scripts/bootstrap_gitops.sh
+
+      - name: Run GitOps bootstrap
+        run: bash scripts/bootstrap_gitops.sh

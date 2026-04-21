@@ -1,0 +1,37 @@
+resource "null_resource" "wait_for_cluster" {
+  provisioner "local-exec" {
+    command = <<EOT
+echo "Waiting for cluster..."
+
+until kubectl get nodes --no-headers 2>/dev/null | grep -q Ready; do
+  echo "Waiting for nodes..."
+  sleep 10
+done
+
+until kubectl get pods -n kube-system 2>/dev/null | grep -E "coredns|aws-node" | grep -q Running; do
+  echo "Waiting for system pods..."
+  sleep 10
+done
+
+echo "Cluster is READY"
+EOT
+  }
+}
+
+resource "null_resource" "wait_for_efs_csi" {
+  depends_on = [helm_release.efs_csi]
+
+  provisioner "local-exec" {
+    command = <<EOT
+echo "Waiting for EFS CSI controller..."
+
+kubectl rollout status deployment efs-csi-controller -n kube-system --timeout=5m
+
+echo "Waiting for EFS CSI node daemonset..."
+
+kubectl rollout status daemonset efs-csi-node -n kube-system --timeout=5m
+
+echo "EFS CSI fully ready"
+EOT
+  }
+}

@@ -1,0 +1,110 @@
+name: Update GitOps
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Images"]
+    types:
+      - completed
+
+concurrency:
+  group: gitops-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: timzapone/kubapp-project
+          token: ${{ secrets.GITOPS_TOKEN }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          sudo wget -qO /usr/local/bin/yq \
+          https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          path: artifacts
+
+      # =========================
+      # VALIDATION (STRICT)
+      # =========================
+      - name: Validate artifacts
+        run: |
+          set -e
+
+          echo "Checking artifacts directory..."
+
+          if [ ! -d "artifacts" ]; then
+            echo "Artifacts directory missing"
+            exit 1
+          fi
+
+          FILES=$(find artifacts -name "*.json")
+
+          if [ -z "$FILES" ]; then
+            echo "No artifacts found"
+            exit 1
+          fi
+
+          echo "Validating JSON files..."
+
+          for file in $FILES; do
+            echo "Checking $file"
+            jq empty "$file" || exit 1
+          done
+
+      - name: Validate GitOps structure
+        run: ./scripts/validate_gitops.sh artifacts
+
+      # =========================
+      # APPLY GITOPS UPDATES
+      # =========================
+      - name: Apply GitOps updates
+        run: |
+          set -e
+
+          for file in $(find artifacts -name "*.json"); do
+            SERVICE=$(jq -r .service "$file")
+            IMAGE=$(jq -r .image "$file")
+            ENV=$(jq -r .env "$file")
+
+            if [ -z "$ENV" ] || [ "$ENV" = "null" ]; then
+              echo "Invalid ENV in $file"
+              exit 1
+            fi
+
+            FILE="gitops/envs/$ENV/$SERVICE/values.yaml"
+
+            echo "Updating $SERVICE ($ENV)"
+
+            if [ ! -f "$FILE" ]; then
+              echo "Missing GitOps file: $FILE"
+              exit 1
+            fi
+
+            yq e ".image.repository = strenv(IMAGE)" -i "$FILE"
+          done
+
+      # =========================
+      # COMMIT CHANGES
+      # =========================
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add .
+          git diff --exit-code
+          git commit -m "gitops update from build pipeline" || exit 0
+          git push

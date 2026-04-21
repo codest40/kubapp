@@ -1,0 +1,24 @@
+replicas: 3
+
+image:
+  repository: codest40/java_dir
+  tag: stable
+
+service:
+  name: admin-service
+  port: 80
+
+resources:
+  requests:
+    cpu: "300m"
+    memory: "512Mi"
+  limits:
+    cpu: "700m"
+    memory: "1Gi"
+
+health:
+  path: /transaction
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+env: []

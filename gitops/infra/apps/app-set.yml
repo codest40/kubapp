@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kubapp-appset
+  namespace: argocd
+
+spec:
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - name: user
+                - name: admin
+
+          - list:
+              elements:
+                - env: dev
+                - env: prod
+
+  template:
+    metadata:
+      name: "{{name}}-{{env}}"
+
+    spec:
+      project: default
+
+      source:
+        repoURL: https://github.com/paragon40/kubapp.git
+        targetRevision: main
+        path: "gitops/apps/{{name}}/chart"
+
+        helm:
+          valueFiles:
+            - ../../envs/{{env}}/{{name}}.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ name }}"
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+

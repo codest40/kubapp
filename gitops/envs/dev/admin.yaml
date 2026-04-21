@@ -1,0 +1,25 @@
+replicas: 2
+
+image:
+  repository: codest40/java_dir
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  name: admin-service
+  port: 80
+
+resources:
+  requests:
+    cpu: "150m"
+    memory: "256Mi"
+  limits:
+    cpu: "400m"
+    memory: "512Mi"
+
+health:
+  path: /transaction
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+env: []
