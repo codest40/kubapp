@@ -5,3 +5,12 @@ provider "helm" {
     token                  = data.aws_eks_cluster_auth.this.token
   }
 }
+
+provider "aws" {
+  region = var.region
+
+  default_tags {
+    tags = local.base_tags
+  }
+}
+

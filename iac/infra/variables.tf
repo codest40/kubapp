@@ -20,7 +20,19 @@ variable "region" {
 }
 
 variable "access_iam_arn" {
-  type = string
+  type      = string
+  sensitive = true
+}
+
+
+variable "admin_arn" {
+  type      = string
+  sensitive = true
+}
+
+variable "account_id" {
+  type      = string
+  sensitive = true
 }
 
 variable "kubernetes_v" {
@@ -30,27 +42,17 @@ variable "kubernetes_v" {
 }
 
 variable "CERT_ARN" {
-  description = "ACM certificate ARN"
+  description = "ACM certificate ARN (test)"
   type        = string
 }
 
-variable "root_domain" {
-  description = "Base domain"
-  type        = string
-}
-
-variable "subdomain" {
-  description = "Service subdomain"
+variable "main_domain" {
+  description = "Main domain automatically provisioned via acm (used in k8s)"
   type        = string
 }
 
 variable "cluster_name" {
   description = "Base cluster name (no env suffix here)"
-  type        = string
-}
-
-variable "hosted_zone_id" {
-  description = "Route53 hosted zone"
   type        = string
 }
 
@@ -60,3 +62,4 @@ variable "log_groups" {
     retention = number
   }))
 }
+

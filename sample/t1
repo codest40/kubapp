@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ============================================================
+# SYS MONITOR FULLY AUTOMATED DEPLOYMENT
+# - Creates/updates AWS infrastructure with Terraform
+# - Updates GitHub Actions secret
+# - Waits for EC2 readiness
+# - Syncs project files to EC2
+# - Starts Docker containers
+# - Configures Nginx (HTTP)
+# - Requests Let's Encrypt certificate
+# - Replaces Nginx with SSL config
+# - Reloads Nginx
+# ============================================================
+
+PROJECT_ROOT="$HOME/Main/devops/kubapp/sys_monitor"
+TF_DIR="$PROJECT_ROOT/infra/aws"
+
+REMOTE_USER="ubuntu"
+REMOTE_HOST=""
+REMOTE_DIR="/opt/sys_monitor"
+
+DOMAIN="sys-monitor.rundailytest.site"
+EMAIL="rundailytest@gmail.com"
+
+KEY_NAME="tf-web-key"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/${KEY_NAME}.pem}"
+
+REPO="${REPO:-paragon40/kubapp}"
+
+# ============================================================
+# PRECHECKS
+# ============================================================
+
+for cmd in terraform ssh rsync curl; do
+  command -v "$cmd" >/dev/null 2>&1 || {
+    echo "ERROR: Required command not found: $cmd"
+    exit 1
+  }
+done
+
+if [[ ! -f "$SSH_KEY" ]]; then
+  echo "ERROR: SSH key not found: $SSH_KEY"
+  exit 1
+fi
+
+# ============================================================
+# TERRAFORM APPLY
+# ============================================================
+
+echo "==================== TERRAFORM APPLY ===================="
+
+cd "$TF_DIR"
+
+terraform init
+
+MY_IP="$(curl -s ifconfig.me)/32"
+
+terraform apply -auto-approve \
+  -var="key_name=${KEY_NAME}" \
+  -var="ssh_cidr=${MY_IP}"
+
+PUBLIC_IP="$(terraform output -raw public_ip)"
+WEBHOOK_URL="$(terraform output -raw github_webhook_url)"
+
+REMOTE_HOST="$PUBLIC_IP"
+
+echo "EC2 Public IP: $PUBLIC_IP"
+echo "Webhook URL:   $WEBHOOK_URL"
+
+# ============================================================
+# CLEAN OLD SSH HOST KEY
+# ============================================================
+
+echo "==================== CLEAN SSH KNOWN HOSTS ===================="
+
+ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$PUBLIC_IP" >/dev/null 2>&1 || true
+ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$DOMAIN" >/dev/null 2>&1 || true
+
+# ============================================================
+# UPDATE GITHUB SECRET
+# ============================================================
+
+echo "==================== UPDATE GITHUB SECRET ===================="
+
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  gh secret set SYS_MONITOR_WEBHOOK \
+    --repo "$REPO" \
+    --body "$WEBHOOK_URL"
+  echo "GitHub secret updated."
+else
+  echo "GitHub CLI not configured. Skipping secret update."
+fi
+
+# ============================================================
+# WAIT FOR SSH
+# ============================================================
+
+echo "==================== WAIT FOR SSH ===================="
+
+for i in {1..30}; do
+  if ssh \
+      -o StrictHostKeyChecking=no \
+      -o ConnectTimeout=5 \
+      -i "$SSH_KEY" \
+      "${REMOTE_USER}@${REMOTE_HOST}" \
+      "echo ok" >/dev/null 2>&1; then
+    echo "SSH is ready."
+    break
+  fi
+
+  if [[ $i -eq 30 ]]; then
+    echo "ERROR: SSH did not become ready."
+    exit 1
+  fi
+
+  sleep 10
+done
+
+# ============================================================
+# ENSURE REMOTE DIRECTORY
+# ============================================================
+
+echo "==================== PREPARE REMOTE DIRECTORY ===================="
+
+ssh \
+  -o StrictHostKeyChecking=no \
+  -i "$SSH_KEY" \
+  "${REMOTE_USER}@${REMOTE_HOST}" <<'EOF'
+set -euo pipefail
+
+sudo mkdir -p /opt/sys_monitor
+sudo chown -R ubuntu:ubuntu /opt/sys_monitor
+EOF
+
+# ============================================================
+# RSYNC PROJECT
+# ============================================================
+
+echo "==================== SYNC PROJECT ===================="
+
+rsync -az --delete \
+  --no-perms --no-owner --no-group \
+  --exclude ".git" \
+  --exclude ".terraform" \
+  --exclude "terraform.tfstate*" \
+  --exclude ".pytest_cache" \
+  -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
+  "$PROJECT_ROOT/" \
+  "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/"
+
+echo "Project synced."
+
+# ============================================================
+# REMOTE DEPLOYMENT
+# ============================================================
+
+echo "==================== REMOTE DEPLOYMENT ===================="
+
+ssh \
+  -t \
+  -o StrictHostKeyChecking=no \
+  -i "$SSH_KEY" \
+  "${REMOTE_USER}@${REMOTE_HOST}" <<EOF
+set -euo pipefail
+
+DOMAIN="$DOMAIN"
+EMAIL="$EMAIL"
+
+cd /opt/sys_monitor
+
+echo "==================== WAIT FOR CLOUD-INIT ===================="
+while [ ! -f /var/lib/cloud/instance/boot-finished ]; do
+  sleep 5
+done
+
+echo "==================== VERIFY DOCKER ===================="
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker not installed yet."
+  exit 1
+fi
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose plugin not installed."
+  exit 1
+fi
+
+sudo systemctl enable docker
+sudo systemctl start docker
+
+echo "==================== START CONTAINERS ===================="
+docker compose down -v || true
+docker compose up -d --build
+
+echo "==================== REMOVE DEFAULT NGINX ===================="
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo rm -f /etc/nginx/sites-available/default
+
+echo "==================== INSTALL HTTP NGINX CONFIG ===================="
+sudo cp infra/aws/nginx.http.conf /etc/nginx/sites-available/sys-monitor
+sudo ln -sf /etc/nginx/sites-available/sys-monitor /etc/nginx/sites-enabled/sys-monitor
+
+sudo nginx -t
+sudo systemctl restart nginx
+
+echo "==================== WAIT FOR DNS ===================="
+for i in {1..60}; do
+  if dig +short "\$DOMAIN" | grep -q .; then
+    echo "DNS is ready."
+    break
+  fi
+  sleep 5
+done
+
+echo "==================== WAIT FOR HTTP ===================="
+for i in {1..60}; do
+  if curl -fsI "http://\$DOMAIN" >/dev/null 2>&1; then
+    echo "HTTP is reachable."
+    break
+  fi
+  sleep 5
+done
+
+echo "==================== REQUEST SSL CERTIFICATE ===================="
+sudo certbot --nginx \
+  -d "\$DOMAIN" \
+  -m "\$EMAIL" \
+  --agree-tos \
+  --non-interactive \
+  --redirect
+
+echo "==================== INSTALL FINAL SSL CONFIG ===================="
+sudo cp infra/aws/nginx.ssl.conf /etc/nginx/sites-available/sys-monitor
+sudo ln -sf /etc/nginx/sites-available/sys-monitor /etc/nginx/sites-enabled/sys-monitor
+
+sudo nginx -t
+sudo systemctl reload nginx
+
+echo "==================== VERIFICATION ===================="
+docker ps
+ss -tulnp | grep -E '80|443|3000|3001|9090' || true
+
+echo "==================== DEPLOYMENT COMPLETE ===================="
+EOF
+
+# ============================================================
+# FINAL OUTPUT
+# ============================================================
+
+echo
+echo "============================================================"
+echo "DEPLOYMENT COMPLETE"
+echo "============================================================"
+echo "Website:      https://${DOMAIN}"
+echo "Prometheus:   https://${DOMAIN}/prometheus/"
+echo "Grafana:      https://${DOMAIN}/grafana/"
+echo "Webhook:      https://${DOMAIN}/webhook/github"
+echo "SSH:          ssh -i ${SSH_KEY} ubuntu@${PUBLIC_IP}"
+echo "============================================================"

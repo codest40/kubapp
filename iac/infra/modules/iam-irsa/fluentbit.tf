@@ -13,9 +13,7 @@ resource "aws_iam_policy" "fluentbit" {
           "logs:CreateLogGroup",
           "logs:DescribeLogStreams"
         ]
-        Resource = [
-          "arn:aws:logs:${var.region}:${var.account_id}:log-group:/${var.cluster_name}/*:*"
-        ]
+        Resource = "*"
       }
     ]
   })

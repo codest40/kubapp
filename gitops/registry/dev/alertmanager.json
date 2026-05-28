@@ -1,0 +1,9 @@
+{
+  "service": "alertmanager",
+  "type": "Backend",
+  "stack": "monitoring",
+  "backendService": "kube-prometheus-stack-alertmanager",
+  "env": "dev",
+  "port": 9093,
+  "timestamp": "2026-05-26_07-42-03"
+}

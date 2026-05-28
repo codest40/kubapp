@@ -1,26 +1,30 @@
-name: Update GitOps
+name: Runtime Image Update
 
 on:
-  workflow_run:
-    workflows: ["Build and Push Docker Images"]
-    types:
-      - completed
+  workflow_dispatch:
 
 concurrency:
-  group: gitops-update
+  group: using-commit
   cancel-in-progress: false
 
 jobs:
   update:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Checkout GitOps repo
+      - name: Generate GitHub App token
+        id: app-token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID_GITHUB }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY_GITHUB }}
+
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          repository: timzapone/kubapp-project
-          token: ${{ secrets.GITOPS_TOKEN }}
+          repository: paragon40/kubapp
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
@@ -30,53 +34,31 @@ jobs:
           https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          run-id: ${{ github.event.workflow_run.id }}
-          path: artifacts
-
-      # =========================
-      # VALIDATION (STRICT)
-      # =========================
-      - name: Validate artifacts
+      - name: Retrieve Currect ENV
         run: |
-          set -e
-
-          echo "Checking artifacts directory..."
-
-          if [ ! -d "artifacts" ]; then
-            echo "Artifacts directory missing"
+          set -euo pipefail
+          STATE_FILE="gitops/state/current.json"
+          if [[ ! -f "$STATE_FILE" || ! -s "$STATE_FILE" ]]; then
+            echo "❌ State File: $STATE_FILE is Missing or Empty."
             exit 1
           fi
 
-          FILES=$(find artifacts -name "*.json")
-
-          if [ -z "$FILES" ]; then
-            echo "No artifacts found"
+          STATE_ENV=$(jq -r '.env' "$STATE_FILE")
+          if [[ -z "$STATE_ENV" || "$STATE_ENV" == "null" ]]; then
+            echo "❌ ENV Source from state file Empty"
             exit 1
           fi
+          echo "Detected ENV: $STATE_ENV"
+          echo "ENV=$STATE_ENV" >> $GITHUB_ENV
 
-          echo "Validating JSON files..."
-
-          for file in $FILES; do
-            echo "Checking $file"
-            jq empty "$file" || exit 1
-          done
-
-      - name: Validate GitOps structure
-        run: ./scripts/validate_gitops.sh artifacts
-
-      # =========================
-      # APPLY GITOPS UPDATES
-      # =========================
       - name: Apply GitOps updates
         run: |
           set -e
-
-          for file in $(find artifacts -name "*.json"); do
+          ENV1="${{ env.ENV }}"
+          for file in $(find gitops/registry/$ENV1/*.json -name "*.json"); do
             SERVICE=$(jq -r .service "$file")
             IMAGE=$(jq -r .image "$file")
+            TAG=$(jq -r .tag "$file")
             ENV=$(jq -r .env "$file")
 
             if [ -z "$ENV" ] || [ "$ENV" = "null" ]; then
@@ -85,26 +67,26 @@ jobs:
             fi
 
             FILE="gitops/envs/$ENV/$SERVICE/values.yaml"
-
-            echo "Updating $SERVICE ($ENV)"
-
-            if [ ! -f "$FILE" ]; then
-              echo "Missing GitOps file: $FILE"
+            if [[ ! -f "$FILE" ]]; then
+              echo "Values File for ${SERVICE}-${ENV} NOT Found"
               exit 1
             fi
 
-            yq e ".image.repository = strenv(IMAGE)" -i "$FILE"
+            echo "Updating ${SERVICE}-${ENV}"
+            echo "Target file: $FILE"
+            echo "Image: $IMAGE"
+            echo "Tag: $TAG"
+            yq e ".image.repository = \"$IMAGE\"" -i "$FILE"
+            yq e ".image.tag = \"$TAG\"" -i "$FILE"
+            echo "Cat $FILE"
+            cat "$FILE"
           done
 
-      # =========================
-      # COMMIT CHANGES
-      # =========================
+      - name: Validate GitOps structure
+        run: ./scripts/validate_gitops.sh
+
       - name: Commit changes
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-
-          git add .
-          git diff --exit-code
-          git commit -m "gitops update from build pipeline" || exit 0
-          git push
+          ENV="${{ env.ENV }}"
+          DIR="gitops/envs/$ENV"
+          bash scripts/commit.sh  "$DIR" "Runtime IMAGE Update"

@@ -1,7 +1,18 @@
-name: Argocd Setup
+name: Argocd And Gitops Bootstrap
 
 on:
   workflow_dispatch:
+    inputs:
+      env:
+        description: Environment
+        required: true
+        default: dev
+        type: choice
+        options: [dev, prod]
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   bootstrap:
@@ -9,36 +20,36 @@ jobs:
     environment: development
 
     steps:
-      # --------------------------------
-      # 1. Checkout repo
-      # --------------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # --------------------------------
-      # 2. AWS credentials
-      # --------------------------------
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Configure AWS credentials
+      #- name: Check AWS credentials
+      #  run: aws sts get-caller-identity
+
+      - name: Install SOPS
         run: |
-          set -e
-          STATUS=$(kubectl get configmap cluster-readiness -n kube-system -o jsonpath='{.data.status}' 2>/dev/null || echo "notready")
+          curl -L -o sops https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
+          chmod +x sops
+          sudo mv sops /usr/local/bin/sops
 
-          if [ "$STATUS" != "ready" ]; then
-            echo "❌ Cluster not ready"
+      - name: Setup AGE key
+        run: |
+          mkdir -p ~/.config/sops/age
+          echo "${{ secrets.AGE_PRIVATE_KEY }}" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+          test -s ~/.config/sops/age/keys.txt || {
+            echo "❌ AGE key missing"
             exit 1
-          fi
-
-          echo "Cluster ready → proceeding with GitOps"
+          }
 
       # --------------------------------
-      # 3. Setup kubeconfig (EKS access)
+      #  Setup kubeconfig (EKS access)
       # --------------------------------
       - name: Setup kubeconfig
         run: |
@@ -62,27 +73,101 @@ jobs:
           echo "=== auth test ==="
           kubectl auth can-i get pods -A || true
 
-      # --------------------------------
-      # 4. Apply ArgoCD GitHub App repo secret
-      # --------------------------------
+      - name: Check Readiness
+        run: bash scripts/check_cluster.sh
+
       - name: Apply ArgoCD GitHub App secret
         run: |
           set -e
 
-          if [ -f gitops/argocd/github-repo-secret.yaml ]; then
-            kubectl apply --validate=false -f gitops/argocd/github-repo-secret.yaml
-            echo "ArgoCD secret applied from file"
-          else
-            echo "Generating secret"
-            python3 scripts/argo_secret.py
-            kubectl apply --validate=false -f gitops/argocd/github-repo-secret.yaml
-          fi
+          SECRET_FILES=$(find gitops/secrets -type f -name "*.yaml" -print)
+          while IFS= read -r one; do
+              DECRYPTED="decrypted-$(basename "$one")"
+              echo "Decrypting secret file: $one"
+              sops -d "$one" > "$DECRYPTED"
+              kubectl apply --validate=false -f "$DECRYPTED"
+              echo "✅ $one ArgoCD secret applied from Sops"
+          done <<< "$SECRET_FILES"
+        env:
+           PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY_GITHUB }}
+           APP_ID: ${{ secrets.APP_ID_GITHUB }}
+           REPO_URL: ${{ secrets.REPO_URL }}
+           BASE_FILE: "$BASE_FILE"
 
-      # --------------------------------
-      # 5. Verify ArgoCD resources
-      # --------------------------------
       - name: Verify ArgoCD namespace access
         run: kubectl get ns argocd
 
       - name: Verify secret exists
         run: kubectl get secret -n argocd | grep github || true
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID_GITHUB }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY_GITHUB }}
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Ensure helm is isntalled
+        run: |
+          if ! command -v helm >/dev/null 2>&1; then
+            sudo snap install helm --classic
+          fi
+
+      - name: Install Metrics Server for HPA
+        run: |
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm upgrade --install metrics-server metrics-server/metrics-server \
+            -n kube-system \
+            --create-namespace
+
+      - name: Make script executable
+        run: chmod +x scripts/bootstrap_gitops.sh
+
+      - name: Run GitOps bootstrap
+        run: bash scripts/bootstrap_gitops.sh
+
+      - name: Get Metadata from Terraform
+        working-directory: iac/infra
+        env:
+          ENV: "${{ github.event.inputs.env }}"
+        run: |
+          set -euo pipefail
+          terraform init -reconfigure -backend-config="envs/${ENV}/backend.hcl"
+          CERT_ARN=$(terraform output -raw main_cert_arn 2>/dev/null || true)
+
+          if [[ -z "$CERT_ARN" ]]; then
+            echo "❌ CERT ARN is empty"
+            exit 1
+          fi
+
+          echo "CERT_ARN Found: $CERT_ARN"
+          echo "CERT_ARN=$CERT_ARN" >> $GITHUB_ENV
+
+      - name: Ensure Route53 is synced
+        env:
+          ENV: "${{ github.event.inputs.env }}"
+          DOMAIN: "${{ secrets.DOMAIN }}"
+          CERT_ARN: "${{ env.CERT_ARN }}"
+          AWS_REGION: "${{ env.AWS_REGION }}"
+        run: |
+          set -euo pipefail
+          for i in {1..8}; do
+            echo "Setting up route53 for Domain if new..."
+            if bash scripts/sync_route53.sh; then
+              echo "✅ Success on attempt $i"
+              break
+            else
+              echo "ALB not ready yet, retrying..."
+              sleep 5
+            fi
+            echo "❌ Route53 sync failed after $i attempts"
+          done
+          echo "End of Workflow!"

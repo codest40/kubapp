@@ -1,0 +1,244 @@
+#!/bin/bash
+set -euo pipefail
+
+# -------------------------------
+# CONFIG
+# -------------------------------
+SYNC_MODE="${SYNC_MODE:-apply}"
+DOMAIN="${DOMAIN:-rundailytest.online}"
+ENV="${ENV:-dev}"
+ING_FILE="${INGRESS_FILE:-gitops/ingress/$ENV/values.yaml}"
+MON_FILE="${MON_FILE:-gitops/ingress/$ENV/monitoring.yaml}"
+ARGO_FILE="${ARGO_FILE:-gitops/ingress/$ENV/argocd.yaml}"
+AWS_REGION="${AWS_REGION:-$(aws configure get region)}"
+CERT_ARN="${CERT_ARN:-}"
+
+echo "===================================="
+echo "Route53 Auto-Provision + Sync"
+echo "SYNC_MODE: $SYNC_MODE"
+echo "DOMAIN: $DOMAIN"
+echo "ENV: $ENV"
+echo "AWS_REGION: $AWS_REGION"
+echo "===================================="
+
+# -------------------------------
+# PRECHECKS
+# -------------------------------
+if [[ -z "$AWS_REGION" ]]; then
+  echo "❌ AWS region not set"
+  exit 1
+fi
+
+if [[ -z "$CERT_ARN" ]]; then
+  echo "❌ CERT_ARN not provided"
+  exit 1
+fi
+
+for each in "$ING_FILE" "$MON_FILE" "$ARGO_FILE"; do
+  if [[ ! -f "$each" ]]; then
+    echo "❌ Ingress File not found: $each"
+    exit 1
+  fi
+done
+
+# -------------------------------
+# CERT VALIDATION (HARD GUARANTEE)
+# -------------------------------
+echo "Validating ACM certificate..."
+
+CERT_STATUS=$(aws acm describe-certificate \
+  --region "$AWS_REGION" \
+  --certificate-arn "$CERT_ARN" \
+  --query "Certificate.Status" \
+  --output text 2>/dev/null || true)
+
+if [[ "$CERT_STATUS" != "ISSUED" ]]; then
+  echo "❌ Certificate not valid in region or not issued: $CERT_ARN"
+  exit 1
+fi
+
+echo "✅ Certificate OK"
+
+# -------------------------------
+# GET ALB FROM K8S
+# -------------------------------
+echo "Fetching ALB from ingress..."
+
+ALB=""
+
+for i in {1..15}; do
+  ALB_ARN=$(aws elbv2 describe-load-balancers \
+    --region "$AWS_REGION" \
+    --query "LoadBalancers[?contains(LoadBalancerName, 'kubapp')].LoadBalancerArn | [0]" \
+    --output text)
+
+  [[ -n "$ALB_ARN" && "$ALB_ARN" != "None" ]] || {
+    echo "❌ No ALB found"
+    exit 1
+  }
+
+  ALB=$(aws elbv2 describe-load-balancers \
+    --region "$AWS_REGION" \
+    --load-balancer-arns "$ALB_ARN" \
+    --query "LoadBalancers[0].DNSName" \
+    --output text)
+
+  if [[ -n "$ALB" ]]; then
+    echo "✅ ALB ready: $ALB"
+    break
+  fi
+
+  echo "⏳ Waiting for ALB ($i/15)"
+  sleep 10
+done
+
+if [[ -z "$ALB" ]]; then
+  echo "❌ ALB never became ready"
+  echo "I will Describe connected ingresses next..."
+  echo "===================================================="
+  kubectl describe ingress kubapp-$ENV-alb -n "$ENV" || true
+  echo "===================================================="
+  kubectl describe ingress kubapp-monitoring-alb -n "$ENV" || true
+  exit 1
+fi
+
+# -------------------------------
+# VERIFY ALB EXISTS IN AWS
+# -------------------------------
+ALB_ARN=$(aws elbv2 describe-load-balancers \
+  --region "$AWS_REGION" \
+  --query "LoadBalancers[?DNSName=='$ALB'].LoadBalancerArn | [0]" \
+  --output text)
+
+if [[ -z "$ALB_ARN" || "$ALB_ARN" == "None" ]]; then
+  echo "❌ ALB not found in AWS ELBv2 API"
+  exit 1
+fi
+
+ALB_ZONE_ID=$(aws elbv2 describe-load-balancers \
+  --region "$AWS_REGION" \
+  --load-balancer-arns "$ALB_ARN" \
+  --query "LoadBalancers[0].CanonicalHostedZoneId" \
+  --output text)
+
+echo "✅ ALB verified in AWS"
+
+# -------------------------------
+# HOSTED ZONE
+# -------------------------------
+echo "Checking Route53 hosted zone..."
+
+ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name "$DOMAIN" \
+  --query "HostedZones[?Name=='${DOMAIN}.'].Id" \
+  --output text 2>/dev/null | sed 's|/hostedzone/||')
+
+ZONE_EXISTS=false
+
+if [[ -z "$ZONE_ID" || "$ZONE_ID" == "None" ]]; then
+  echo "Creating hosted zone..."
+
+  CREATE_OUTPUT=$(aws route53 create-hosted-zone \
+    --name "$DOMAIN" \
+    --caller-reference "$(date +%s)-kubapp")
+
+  ZONE_ID=$(echo "$CREATE_OUTPUT" | jq -r '.HostedZone.Id' | sed 's|/hostedzone/||')
+
+  echo "✅ Hosted zone created: $ZONE_ID"
+else
+  echo "✅ Existing zone: $ZONE_ID"
+  ZONE_EXISTS=true
+fi
+
+# -------------------------------
+# NAMECHEAP INFO (ONLY FIRST TIME)
+# -------------------------------
+if [[ "$ZONE_EXISTS" == false ]]; then
+  echo ""
+  echo "===================================="
+  echo "NAMECHEAP DELEGATION (ONCE ONLY)"
+  echo "===================================="
+
+  aws route53 get-hosted-zone \
+    --id "$ZONE_ID" \
+    --query "DelegationSet.NameServers[]" \
+    --output text
+
+  echo ""
+  echo "Add these to Namecheap DNS"
+  echo "===================================="
+fi
+
+# -------------------------------
+# SERVICES FROM GITOPS
+# -------------------------------
+
+APP_SERVICES=$(yq e '.services[].name' "$ING_FILE" 2>/dev/null || true)
+MON_SERVICES=$(yq e '.services[].name' "$MON_FILE" 2>/dev/null || true)
+ARGO_SERVICES=$(yq e '.services[].name' "$ARGO_FILE" 2>/dev/null || true)
+
+ALL_SERVICES=$(printf "%s\n%s\n%s\n" \
+  "$APP_SERVICES" \
+  "$MON_SERVICES" \
+  "$ARGO_SERVICES" \
+  | grep -v '^$' \
+  | sort -u)
+
+mapfile -t SERVICES <<< "$ALL_SERVICES"
+
+# -------------------------------
+# ROOT DOMAIN
+# -------------------------------
+echo "Updating root domain..."
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id "$ZONE_ID" \
+  --change-batch "{
+    \"Changes\": [{
+      \"Action\": \"UPSERT\",
+      \"ResourceRecordSet\": {
+        \"Name\": \"$DOMAIN\",
+        \"Type\": \"A\",
+        \"AliasTarget\": {
+          \"HostedZoneId\": \"$ALB_ZONE_ID\",
+          \"DNSName\": \"$ALB\",
+          \"EvaluateTargetHealth\": false
+        }
+      }
+    }]
+  }"
+
+# -------------------------------
+# SUBDOMAINS
+# -------------------------------
+echo "======================================"
+echo "Updating subdomains..."
+echo "Total Services Found: ${#SERVICES[@]}"
+for svc in "${SERVICES[@]}"; do
+  echo "$svc"
+done
+echo "======================================"
+
+for svc in "${SERVICES[@]}"; do
+  FQDN="$svc.$DOMAIN"
+
+  aws route53 change-resource-record-sets \
+    --hosted-zone-id "$ZONE_ID" \
+    --change-batch "{
+      \"Changes\": [{
+        \"Action\": \"UPSERT\",
+        \"ResourceRecordSet\": {
+          \"Name\": \"$FQDN\",
+          \"Type\": \"CNAME\",
+          \"TTL\": 60,
+          \"ResourceRecords\": [{\"Value\": \"$ALB\"}]
+        }
+      }]
+    }"
+
+  echo "→ $FQDN updated"
+done
+
+echo "===================================="
+echo "DNS SYNC COMPLETE"
+echo "===================================="

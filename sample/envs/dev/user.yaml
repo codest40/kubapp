@@ -1,0 +1,20 @@
+replicas: 2
+
+image:
+  repository: nginx
+  tag: latest
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "300m"
+    memory: "256Mi"
+
+health:
+  path: /user
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+env: []

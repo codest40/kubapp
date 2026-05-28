@@ -1,0 +1,119 @@
+name: Retrieve Stable Commit for Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Environment
+        required: true
+        default: dev
+        type: choice
+        options: [dev, prod]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh jq
+
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Get latest stable tag
+        id: tag
+        env:
+          ENV: "${{ github.event.inputs.env }}"
+        run: |
+          set -euo pipefail
+          TAG=$(git ls-remote --tags origin \
+            | awk '{print $2}' \
+            | grep "^refs/tags/stable-${ENV}-" \
+            | grep -v '\^{}' \
+            | sed 's|refs/tags/||' \
+            | sort -V \
+            | tail -n 1 || true
+          )
+
+          if [[ -z "$TAG" ]]; then
+            echo "❌ No Tag Found For Stable Deploy"
+            exit 1
+          fi
+
+          echo "Tag Found: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Resolve commit
+        id: commit
+        run: |
+          git fetch --tags origin
+          COMMIT=$(git rev-list -n 1 ${{ steps.tag.outputs.tag }})
+          if [[ -z "$COMMIT" ]]; then
+            echo "❌ Failed To Resolve Commit"
+            exit 1
+          fi
+          echo "COMMIT=$COMMIT"
+          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+
+      - name: Show commit details
+        run: |
+          echo "=============================="
+          echo "COMMIT DETAILS"
+          echo "=============================="
+
+          git fetch --depth=1 origin ${{ steps.commit.outputs.commit }}
+          git show ${{ steps.commit.outputs.commit }}
+
+      - name: Get run ID
+        id: run
+        run: |
+          RUN_ID=$(gh run list \
+            --workflow verify_runtime.yml \
+            --commit ${{ steps.commit.outputs.commit }} \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId'
+          )
+
+          if [[ -z "$RUN_ID" ]]; then
+            echo "❌ No Run_ID Found For Stable Deploy"
+            exit 1
+          fi
+
+          echo "Found RUN_ID=$RUN_ID"
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - name: List artifacts for run
+        run: |
+          gh api repos/${{ github.repository }}/actions/runs/${{ steps.run.outputs.run_id }}/artifacts \
+            | jq '.artifacts[] | {name, size_in_bytes, expired}'
+
+      - name: Download snapshot
+        run: |
+          gh run download ${{ steps.run.outputs.run_id }} \
+            --name deployment-snapshot \
+            --dir deployment-snapshot
+
+      - name: Show snapshot
+        run: |
+          set -euo pipefail
+          echo "=============================="
+          echo "DEPLOYMENT SNAPSHOT"
+          echo "=============================="
+
+          SNAPSHOT_DIR=$(find . -type d -name "deployment-snapshot" | head -1)
+          if [[ -z "$SNAPSHOT_DIR" ]]; then
+            echo "❌ Snapshot directory not found"
+            exit 1
+          fi
+          find "$SNAPSHOT_DIR" -type f -name "*.json" -exec cat {} \;
+

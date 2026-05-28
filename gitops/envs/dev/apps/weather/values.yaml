@@ -1,0 +1,75 @@
+appName: weather
+namespace: dev
+serviceAccount:
+  create: true
+  name: weather-sa
+  roleArn: arn:aws:iam::198200019771:role/kubapp-dev-app-pods-role
+serviceMonitor:
+  enabled: true
+  path: /metrics
+  interval: 30s
+replicaCount: 2
+image:
+  repository: paragon40/weather_app
+  tag: 0acdef5f43654075a87509cae340a1c54dd628bb-1779781278
+  pullPolicy: Always
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 256Mi
+env: {}
+securityContext:
+  pod:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  container:
+    runAsNonRoot: true
+    runAsUser: 10006
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+probes:
+  readiness:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  liveness:
+    httpGet:
+      path: /live
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 15
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  cpu: 70
+  memory: 70
+meta:
+  staticFingerprint: 1f3b831b2cf66454cfd85ffc89c9a88645d5eae258e7587330db355c10509795
+  generatedAt: 2026-05-27T11:22:13Z
+  source: build-pipeline
+storage:
+  volumes:
+    - name: edgepaas-vol
+      emptyDir: {}
+  volumeMounts:
+    - name: edgepaas-vol
+      mountPath: /tmp
+secret:
+  enabled: true
+  name: weather-secrets
+labels:
+  compute: fargate

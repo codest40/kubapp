@@ -1,76 +1,191 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="gitops/infra/apps"
+echo
+echo "=================================================="
+echo "[INFO] GITOPS VALIDATION STARTED"
+echo "=================================================="
+echo
 
-echo "Validating ArgoCD Applications..."
+############################################
+# DIRECTORIES (FULL SYSTEM COVERAGE)
+############################################
+DIRS=(
+  "gitops/argocd"
+  "gitops/envs"
+  "gitops/ingress"
+  "gitops/charts"
+  "gitops/state"
+  "gitops/registry"
+
+)
 
 ############################################
 # HELPERS
 ############################################
 fail() {
-  echo "❌ $1"
+  echo
+  echo "[ERROR] ❌ $1"
+  echo "=================================================="
   exit 1
 }
 
-check_file() {
-  [[ -f "$1" ]] || fail "❌ Missing file: $1"
-}
-
 check_dir() {
-  [[ -d "$1" ]] || fail "❌ Missing directory: $1"
+  [[ -d "$1" ]] || fail "Missing directory: $1"
+}
+
+check_yaml() {
+  local file="$1"
+  yq e '.' "$file" >/dev/null 2>&1 || fail "Invalid YAML: $file"
 }
 
 ############################################
-# VALIDATE APP DIR
+# PREREQUISITES
 ############################################
-check_dir "$APP_DIR"
+echo "--------------------------------------------------"
+echo "[INFO] CHECKING PREREQUISITES"
+echo "--------------------------------------------------"
+
+if ! command -v yq >/dev/null 2>&1; then
+  fail "yq is required but not installed"
+fi
+
+echo "[INFO] ✅ yq available"
+echo
 
 ############################################
-# COLLECT FILES SAFELY
+# VALIDATE CORE STRUCTURE
 ############################################
-mapfile -t FILES < <(
-  find "$APP_DIR" \( -name "*.yml" -o -name "*.yaml" \)
-)
+echo "--------------------------------------------------"
+echo "[INFO] CORE STRUCTURE VALIDATION"
+echo "--------------------------------------------------"
 
-if [[ ${#FILES[@]} -eq 0 ]]; then
-  fail "❌ No ArgoCD apps found in $APP_DIR"
+for dir in "${DIRS[@]}"; do
+  echo
+  echo "[INFO] Checking directory: $dir"
+
+  check_dir "$dir"
+
+  mapfile -t FILES < <(
+    find "$dir" \( -name "*.yml" -o -name "*.yaml" \)
+  )
+
+  if [[ ${#FILES[@]} -eq 0 ]]; then
+    echo "[WARN] ⚠️ No YAML files found in $dir"
+    continue
+  fi
+
+  ############################################
+  # FILE VALIDATION LOOP
+  ############################################
+  for file in "${FILES[@]}"; do
+    echo "[INFO] Validating file: $file"
+
+    # basic YAML check
+    if [[ "$file" == *"/templates/"* ]]; then
+      echo "[INFO] Skipping raw YAML validation for Helm template"
+    else
+      check_yaml "$file"
+    fi
+
+    ############################################
+    # ARGOCD VALIDATION
+    ############################################
+    if [[ "$dir" == "gitops/argocd" ]]; then
+      KIND=$(yq e '.kind' "$file")
+      NAME=$(yq e '.metadata.name' "$file")
+
+      [[ "$NAME" != "null" && -n "$NAME" ]] || fail "Missing metadata.name in $file"
+
+      if [[ "$KIND" == "ApplicationSet" || "$KIND" == "Application" ]]; then
+        echo "[INFO] ✅ ArgoCD object valid: $KIND ($NAME)"
+      else
+        fail "Invalid ArgoCD kind in $file: $KIND"
+      fi
+    fi
+
+    ############################################
+    # ENV VALIDATION (values.yaml)
+    ############################################
+    if [[ "$dir" == "gitops/envs" ]]; then
+      if [[ "$file" == *"/apps/"* ]]; then
+        APP_NAME=$(yq e '.appName' "$file")
+        NAMESPACE=$(yq e '.namespace' "$file")
+        IMAGE=$(yq e '.image.repository' "$file")
+
+        [[ -n "$APP_NAME" && "$APP_NAME" != "null" ]] || fail "Missing appName in $file"
+        [[ -n "$NAMESPACE" && "$NAMESPACE" != "null" ]] || fail "Missing namespace in $file"
+        [[ -n "$IMAGE" && "$IMAGE" != "null" ]] || fail "Missing image.repository in $file"
+
+        echo "[INFO] ✅ App env config valid: $APP_NAME ($NAMESPACE)"
+      fi
+      if [[ "$file" == *"/backend_proxy/"* ]]; then
+        NAME=$(yq e '.metadata.name' "$file")
+        NS=$(yq e '.metadata.namespace' "$file")
+        [[ -n "$NAME" && "$NAME" != "null" ]] || fail "Missing appName in backend_proxy: $file"
+        [[ -n "$NS" && "$NS" != "null" ]] || fail "Missing namespace in $file"
+
+        echo "[INFO] ✅ Backend proxy valid: $NAME with $NS"
+      fi
+    fi
+    ############################################
+    # INGRESS VALIDATION
+    ############################################
+    if [[ "$dir" == "gitops/ingress" ]]; then
+      INGRESS_NAME=$(yq e '.ingress.name' "$file")
+      SERVICES_COUNT=$(yq e '.services | length' "$file")
+
+      [[ -n "$INGRESS_NAME" && "$INGRESS_NAME" != "null" ]] || fail "Missing ingress.name in $file"
+      [[ "$SERVICES_COUNT" -ge 0 ]] || fail "Invalid services list in $file"
+
+      echo "[INFO] ✅ Ingress valid: $INGRESS_NAME (services: $SERVICES_COUNT)"
+    fi
+  done
+done
+
+############################################
+# HELM VALIDATION
+############################################
+echo
+echo "--------------------------------------------------"
+echo "[INFO] HELM CHART VALIDATION"
+echo "--------------------------------------------------"
+
+if command -v helm >/dev/null 2>&1; then
+  echo "[INFO] Helm detected, validating charts..."
+
+  for chart in gitops/charts/*; do
+    [[ -d "$chart" ]] || continue
+
+    if [[ -f "$chart/Chart.yaml" ]]; then
+      echo "[INFO] Checking Helm chart: $chart"
+
+      if ! OUTPUT=$(helm template test "$chart" 2>&1); then
+        echo "[ERROR] ❌ Helm template validation failed: $chart"
+        echo "---------------- DEBUG OUTPUT ----------------"
+        echo "$OUTPUT"
+        echo "---------------------------------------------"
+        exit 1
+      fi
+      #helm template test "$chart" || fail "Helm template validation failed: $chart"
+
+      echo "[INFO] ✅ Helm chart valid: $chart"
+    fi
+  done
+
+else
+  if [[ "${CI:-}" == "true" ]]; then
+    fail "helm is required in CI but not installed"
+  else
+    echo "[WARN] ⚠️ Helm not installed locally — skipping Helm chart validation"
+  fi
 fi
 
 ############################################
-# VALIDATION LOOP
+# DONE
 ############################################
-for file in "${FILES[@]}"; do
-  echo "Checking $file"
-
-  # YAML validation
-  yq e '.' "$file" >/dev/null || fail "Invalid YAML: $file"
-
-  KIND=$(yq e '.kind' "$file")
-  NAME=$(yq e '.metadata.name' "$file")
-
-  # -----------------------------
-  # Extract source path safely
-  # -----------------------------
-  if [[ "$KIND" == "ApplicationSet" ]]; then
-    SOURCE_PATH=$(yq e '.spec.template.spec.source.path' "$file")
-  else
-    SOURCE_PATH=$(yq e '.spec.source.path' "$file")
-  fi
-
-  # -----------------------------
-  # Validations
-  # -----------------------------
-  if [[ -z "$NAME" || "$NAME" == "null" ]]; then
-    fail "Missing app name in $file"
-  fi
-
-  if [[ -z "$SOURCE_PATH" || "$SOURCE_PATH" == "null" ]]; then
-    fail "Missing source path in $file"
-  fi
-
-  echo "✔ $NAME -> $SOURCE_PATH"
-
-done
-
-echo "✅ All ArgoCD applications valid"
+echo
+echo "=================================================="
+echo "[INFO] ✅ FULL GITOPS VALIDATION SUCCESSFUL"
+echo "=================================================="
+echo

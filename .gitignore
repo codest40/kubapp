@@ -2,6 +2,8 @@
 # OS / Editor / IDE
 ########################################
 
+sample
+
 # Linux
 *~
 .fuse_hidden*
@@ -45,8 +47,6 @@ $RECYCLE.BIN/
 *.pfx
 *.p12
 
-secrets.yml
-secrets.yaml
 vault.yml
 vault.yaml
 
@@ -179,6 +179,7 @@ temp/
 *.swp
 *.swo
 *.bak
+*.bak.*
 *.old
 
 ########################################
@@ -187,3 +188,5 @@ temp/
 
 site/
 docs/_build/
+artifacts/
+.backup/

@@ -1,0 +1,49 @@
+name: Test Run Argocd
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      # --------------------------------
+      # 1. Checkout repo
+      # --------------------------------
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      # --------------------------------
+      # 2. AWS credentials
+      # --------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Check AWS credentials
+        run: aws sts get-caller-identity
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID_GITHUB }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY_GITHUB }}
+
+      - name: Check Readiness
+        run: bash scripts/check_cluster.sh
+
+      - name: Destroy system
+        run: |
+          kubectl delete  -n argocd -f gitops/argocd/appset.yaml
+          kubectl delete  -n argocd -f gitops/argocd/ingress-app.yaml
+
+      - name: Recreate
+        run: bash scripts/bootstrap_gitops.sh

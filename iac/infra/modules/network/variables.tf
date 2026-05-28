@@ -3,17 +3,20 @@ variable "name" {
   type        = string
 }
 
+variable "cluster_name" {
+  description = "helper tag for downward resources"
+  type        = string
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
 }
 
-variable "vpc_flow_log" {
+
+variable "vpc_flow_log_arn" {
   description = "CloudWatch log group configuration for VPC flow logs"
-  type = object({
-    name      = string
-    retention = number
-  })
+  type        = string
 }
 
 variable "azs" {

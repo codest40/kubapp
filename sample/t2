@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+FIRST_RUN="${1:-true}"
+
+PROJECT_ROOT="$HOME/Main/devops/kubapp/sys_monitor"
+TF_DIR="$PROJECT_ROOT/infra/aws"
+
+REMOTE_USER="ubuntu"
+REMOTE_DIR="/opt/sys_monitor"
+
+EMAIL="rundailytest@gmail.com"
+DOMAIN="sys-monitor.rundailytest.site"
+
+KEY_NAME="tf-web-key"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/${KEY_NAME}.pem}"
+
+REPO="${REPO:-paragon40/kubapp}"
+
+cd "$TF_DIR"
+
+# ============================================================
+# TERRAFORM
+# ============================================================
+
+terraform init
+
+MY_IP="$(curl -s ifconfig.me)/32"
+
+terraform apply -auto-approve \
+  -var="key_name=${KEY_NAME}" \
+  -var="ssh_cidr=${MY_IP}"
+
+PUBLIC_IP="$(terraform output -raw public_ip)"
+
+echo "EC2 PUBLIC IP: $PUBLIC_IP"
+
+WEBHOOK_URL="$(terraform output -raw github_webhook_url)"
+
+# ============================================================
+# REMOVE OLD SSH HOST KEY IF INSTANCE REPLACED
+# ============================================================
+
+if [[ "$FIRST_RUN" == "false" ]]; then
+  ssh-keygen -R "$PUBLIC_IP" || true
+fi
+
+# ============================================================
+# UPDATE GITHUB SECRET
+# ============================================================
+
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  gh secret set SYS_MONITOR_WEBHOOK \
+    --repo "$REPO" \
+    --body "$WEBHOOK_URL"
+fi
+
+# ============================================================
+# WAIT FOR SSH
+# ============================================================
+
+echo "Waiting for SSH..."
+
+for i in {1..40}; do
+  if ssh \
+      -o StrictHostKeyChecking=no \
+      -o ConnectTimeout=5 \
+      -i "$SSH_KEY" \
+      ubuntu@"$PUBLIC_IP" "echo SSH_READY" >/dev/null 2>&1; then
+    echo "SSH READY"
+    break
+  fi
+
+  sleep 10
+done
+
+# ============================================================
+# ENSURE REMOTE DIRECTORY EXISTS
+# ============================================================
+
+ssh \
+  -o StrictHostKeyChecking=no \
+  -i "$SSH_KEY" \
+  ubuntu@"$PUBLIC_IP" \
+  "sudo mkdir -p $REMOTE_DIR && sudo chown -R ubuntu:ubuntu $REMOTE_DIR"
+
+# ============================================================
+# SYNC PROJECT
+# ============================================================
+
+echo "Syncing project..."
+
+rsync -avz --delete \
+  --no-perms \
+  --no-owner \
+  --no-group \
+  -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" \
+  --exclude ".git" \
+  --exclude ".terraform" \
+  --exclude "terraform.tfstate*" \
+  "$PROJECT_ROOT/" \
+  ubuntu@"$PUBLIC_IP":"$REMOTE_DIR/"
+
+# ============================================================
+# REMOTE SETUP
+# ============================================================
+
+echo "Running remote setup..."
+
+ssh \
+  -o StrictHostKeyChecking=no \
+  -i "$SSH_KEY" \
+  ubuntu@"$PUBLIC_IP" << EOF
+
+set -euo pipefail
+
+cd $REMOTE_DIR
+
+# ============================================================
+# WAIT FOR CLOUD-INIT / USER-DATA
+# ============================================================
+
+echo "Waiting for cloud-init..."
+
+while [ ! -f /var/lib/cloud/instance/boot-finished ]; do
+  sleep 5
+done
+
+# ============================================================
+# VERIFY REQUIRED PACKAGES
+# ============================================================
+
+command -v docker
+command -v nginx
+command -v certbot
+
+# ============================================================
+# START DOCKER
+# ============================================================
+
+sudo systemctl enable docker
+sudo systemctl restart docker
+
+# ============================================================
+# START CONTAINERS FIRST
+# ============================================================
+
+echo "Starting containers..."
+
+docker compose down -v || true
+docker compose up -d --build
+
+sleep 15
+
+docker ps
+
+# ============================================================
+# REMOVE DEFAULT NGINX
+# ============================================================
+
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo rm -f /etc/nginx/sites-available/default
+
+# ============================================================
+# INSTALL HTTP CONFIG FIRST
+# ============================================================
+
+sudo cp infra/aws/nginx.http.conf /etc/nginx/sites-available/sys-monitor
+
+sudo ln -sf \
+  /etc/nginx/sites-available/sys-monitor \
+  /etc/nginx/sites-enabled/sys-monitor
+
+# ============================================================
+# NGINX TEST
+# ============================================================
+
+sudo nginx -t
+
+sudo systemctl restart nginx
+
+# ============================================================
+# WAIT FOR DNS
+# ============================================================
+
+echo "Waiting for DNS..."
+
+for i in {1..60}; do
+  if dig +short $DOMAIN | grep -q .; then
+    echo "DNS READY"
+    break
+  fi
+
+  sleep 5
+done
+
+# ============================================================
+# WAIT FOR HTTP
+# ============================================================
+
+echo "Waiting for HTTP..."
+
+for i in {1..60}; do
+  if curl -I http://$DOMAIN >/dev/null 2>&1; then
+    echo "HTTP READY"
+    break
+  fi
+
+  sleep 5
+done
+
+# ============================================================
+# SSL CERTIFICATE
+# ============================================================
+
+echo "Generating SSL certificate..."
+
+sudo certbot --nginx \
+  -d $DOMAIN \
+  -m $EMAIL \
+  --agree-tos \
+  --non-interactive \
+  --redirect
+
+# ============================================================
+# INSTALL FINAL SSL CONFIG
+# ============================================================
+
+echo "Installing SSL nginx config..."
+
+sudo cp infra/aws/nginx.ssl.conf \
+  /etc/nginx/sites-available/sys-monitor
+
+sudo ln -sf \
+  /etc/nginx/sites-available/sys-monitor \
+  /etc/nginx/sites-enabled/sys-monitor
+
+# ============================================================
+# FINAL NGINX RELOAD
+# ============================================================
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+# ============================================================
+# VERIFY SERVICES
+# ============================================================
+
+echo "================ RUNNING CONTAINERS ================"
+docker ps
+
+echo "================ LISTENING PORTS ==================="
+ss -tulnp | grep -E '80|443|3000|3001|9090' || true
+
+echo "================ HEALTH CHECKS ====================="
+
+curl -I http://localhost:3000 || true
+curl -I http://localhost:3001 || true
+curl -I http://localhost:9090 || true
+
+echo "REMOTE SETUP COMPLETE"
+
+EOF
+
+echo ""
+echo "===================================================="
+echo "DEPLOYMENT COMPLETE"
+echo "===================================================="
+echo "HTTP  : http://$DOMAIN"
+echo "HTTPS : https://$DOMAIN"
+echo "===================================================="

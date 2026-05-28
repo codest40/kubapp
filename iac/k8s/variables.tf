@@ -17,26 +17,16 @@ variable "region" {
   type = string
 }
 
-variable "cert_arn" {
+variable "alert_email" {
   type = string
 }
 
-variable "domain" {
-  type = string
-}
-
-variable "DOCKER_PASSWORD" {
+variable "alert_email_password" {
   type      = string
   sensitive = true
 }
 
-variable "DOCKER_USERNAME" {
-  type      = string
-  sensitive = true
+variable "main_domain" {
+  type = string
 }
 
-variable "tags" {
-  description = "Additional tags"
-  type        = map(string)
-  default     = {}
-}

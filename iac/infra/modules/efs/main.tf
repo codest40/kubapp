@@ -1,5 +1,5 @@
 resource "aws_security_group" "efs" {
-  name        = "efs-sg"
+  name        = "${var.name_prefix}-efs-sg"
   description = "Allow NFS access to EFS"
   vpc_id      = var.vpc_id
 
@@ -15,19 +15,27 @@ resource "aws_security_group" "efs" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
-  tags = var.tags
+  tags = merge(var.tags, {
+    resource-type = "security-group"
+    sg-scope      = "storage"
+    cluster       = var.cluster_name
+    eni-cluster   = var.cluster_name
+    workload-type = "efs"
+  })
 }
 
 resource "aws_efs_file_system" "this" {
-  creation_token = "kubapp-efs"
-
-  encrypted = true
-
+  creation_token = "${var.name_prefix}-efs"
+  encrypted      = true
   tags = merge(var.tags, {
-    Name = "kubapp-efs"
+    name          = "${var.name_prefix}-efs"
+    resource-type = "efs"
+    cluster       = var.cluster_name
+    eni-cluster   = var.cluster_name
+    storage-type  = "shared-persistent-volume"
   })
 }
 

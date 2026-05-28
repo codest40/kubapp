@@ -4,7 +4,8 @@ locals {
     {
 
       ingress = {
-        description = "ALB ingress"
+        description = "Network entry point (ingress)"
+        workload    = "ingress"
 
         ingress = [
           {
@@ -33,6 +34,7 @@ locals {
 
       ec2_app = {
         description = "EC2 transaction app"
+        workload    = "backend"
 
         ingress = [
           {
@@ -54,7 +56,8 @@ locals {
       }
 
       fargate_app = {
-        description = "Fargate user app"
+        description = "Serverless user-facing workload app"
+        workload    = "frontend/user"
 
         ingress = [
           {
@@ -77,6 +80,7 @@ locals {
 
       app_cache = {
         description = "Cache service"
+        workload    = "cache"
 
         ingress = [
           {

@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ENV="${1:-dev}"
+PUSH="${PUSH:-no}"
+PUSH="${PUSH,,}"
 
 echo "=============================="
 echo "ACTIVATION PIPELINE"
@@ -11,30 +13,57 @@ echo "=============================="
 ############################################
 # 1. VALIDATION (STRICT)
 ############################################
+echo "[ACTIVATE] RUNNING VALIDATE SCRIPT..."
 ./scripts/validate.sh "$ENV"
 
 ############################################
 # 2. PRE-FLIGHT EXECUTION SCRIPTS
 ############################################
-echo "Running preflight scripts..."
+echo "[ACTIVATE] RUNNING ENCRYPT SECRETS SCRIPT..."
 
 ./scripts/encrypt_secrets.sh "$ENV"
+
+echo "[ACTIVATE] RUNNING VALIDATE GITOPS SCRIPT..."
 ./scripts/validate_gitops.sh
 
 ############################################
-# 3. GIT PUSH (ONLY IF USER CONFIRMS)
+# 3. GIT PUSH
 ############################################
-read -rp "Push to GitHub? (yes/no): " CONFIRM
+echo "--------------------------------------------------"
+echo "[INFO] GIT OPERATIONS"
+echo "--------------------------------------------------"
 
-if [[ "$CONFIRM" == "yes" ]]; then
-  git add .
-  git commit -m "chore: activate pipeline for $ENV" || echo "No changes"
-  git push
-  echo "✅ Pushed to GitHub"
-else
-  echo "Skipped push"
+End() {
+echo "====================================================="
+echo "✅ ACTIVATION COMPLETE: $(date '+%Y-%m-%d_%H:%M:%S')"
+echo "====================================================="
+exit 0
+}
+
+if [[ "$PUSH" == "no" ]]; then
+  read -rp "Push to GitHub? (yes/no): " CONFIRM
+  if [[ "$CONFIRM" == "yes" ]]; then
+    echo "[INFO] Staging changes..."
+  else
+    echo "[WARN] ⚠️ Push skipped by user"
+    End
+  fi
 fi
 
-echo "=============================="
-echo "✅ ACTIVATION COMPLETE"
-echo "=============================="
+git add .
+
+COMMIT_MSG="[CHORE (Activate)]: run activation pipeline for $ENV - $(date '+%Y-%m-%d %H:%M:%S')"
+
+echo "[INFO] Creating commit..."
+git commit -m "$COMMIT_MSG" || echo "[WARN] ⚠️ No changes to commit"
+
+echo "[INFO] Pushing to remote..."
+if git push; then
+  echo "[INFO] ✅ Push successful"
+else
+  echo "[WARN] ⚠️  Remote State Changed, Rebasing First..."
+  git pull --rebase && git push
+  echo "[INFO] ✅ Push successful"
+fi
+
+End || true

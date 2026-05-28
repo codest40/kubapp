@@ -1,0 +1,25 @@
+- name: Notify Slack
+  if: success()
+  run: |
+    curl -X POST $SLACK_WEBHOOK_URL \
+      -H 'Content-type: application/json' \
+      --data "{
+        \"text\": \"✅ Workflow succeeded: ${{ github.repository }} #${{ github.run_number }}\"
+      }"
+
+
+- name: Trigger external system event
+  if: success()
+  run: |
+    curl -X POST https://api.github.com/repos/OWNER/REPO/dispatches \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      -d '{
+        "event_type": "workflow_success",
+        "client_payload": {
+          "repo": "${{ github.repository }}",
+          "run_id": "${{ github.run_id }}"
+        }
+      }'
+
+

@@ -39,6 +39,8 @@ if [[ -z "$LOCK_ID" ]]; then
   exit 1
 fi
 
+LOCK_ID=$(echo "$LOCK_ID" | xargs)
+
 cd "$BASE_DIR"
 echo "Initializing backend..."
 terraform init -backend-config="envs/${ENV}/backend.hcl" -input=false

@@ -1,0 +1,31 @@
+
+service:
+  name: user
+
+app:
+  port: 3000
+  appUser: user_app
+  healthPath: /health
+  livePath: /live
+  basePath: /
+
+deploy:
+  env: dev
+  containerUid: 10002
+
+
+storage:
+  volumes:
+    - name: user-volume
+      emptyDir: {}
+
+  volumeMounts:
+    - name: user-mnt
+      mountPath: /data
+
+features:
+  topVolume:
+    enabled: true
+  tmp:
+    enabled: true
+

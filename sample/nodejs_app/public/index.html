@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Docker Test App</title>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      margin-top: 80px;
+      background: #0f172a;
+      color: white;
+    }
+    .box {
+      padding: 20px;
+      border: 1px solid #334155;
+      display: inline-block;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>🚀 Node.js Docker Test App</h1>
+    <p>If you can see this, your container works.</p>
+    <button onclick="check()">Kubapp API</button>
+    <pre id="out"></pre>
+  </div>
+
+  <script>
+    async function check() {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      document.getElementById('out').innerText =
+        JSON.stringify(data, null, 2);
+    }
+  </script>
+</body>
+</html>

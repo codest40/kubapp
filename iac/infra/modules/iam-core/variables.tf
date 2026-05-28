@@ -3,6 +3,10 @@ variable "cluster_name" {
   type        = string
 }
 
+variable "account_id" {
+  type = string
+}
+
 variable "tags" {
   description = "Tags applied to all IAM resources"
   type        = map(string)

@@ -3,10 +3,15 @@ name: Rollback
 on:
   workflow_dispatch:
     inputs:
-      commit:
-        description: "Commit SHA to rollback"
+      tag:
+        description: "Stable deployment tag to rollback to"
         required: true
-
+      mode:
+        description: "Choice Deploy mode"
+        required: true
+        default: target
+        type: choice
+        options: [target, full]
 jobs:
   rollback:
     runs-on: ubuntu-latest
@@ -14,12 +19,45 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Revert commit safely
+      - name: Rollback to stable tag
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git revert ${{ github.event.inputs.commit }} --no-edit
-          git push origin main
+          git fetch --tags
 
+          TAG="${{ github.event.inputs.tag }}"
+
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag not found: $TAG"
+            exit 1
+          fi
+
+          echo "Rolling back to $TAG"
+          mode="${{github.event.inputs.mode}}"
+          if [[ "$mode" == "target" ]]; then
+            # restore gitops state only
+            git restore --source="$TAG" -- gitops/envs
+            git add gitops/envs
+
+            git diff --cached --quiet && {
+              echo "No changes in git to commit rollback"
+              exit 0
+            }
+
+            git commit -m "rollback to $TAG"
+            git push
+            echo "✅ Rollback applied and pushed for gitops/envs"
+          else
+            echo "Running FULL rollback to $TAG"
+            git fetch origin main
+            git checkout main
+            git reset --hard "$TAG"
+            git push origin main --force-with-lease
+            echo "✅ Rollback completed with full Histeory rewrite"
+          fi

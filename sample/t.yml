@@ -1,0 +1,46 @@
+name: Test ENI + ELB Cleanup Engine
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-engine:
+    runs-on: ubuntu-latest
+
+    env:
+      ENV: dev
+      AWS_REGION: us-east-1
+      CLUSTER_NAME: kubapp-dev
+      VPC_ID: vpc-053b87f4e75163019
+      DRY_RUN: true
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq unzip curl
+
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --update
+
+          aws --version
+          jq --version
+
+      - name: Make script executable
+        run: chmod +x scripts/delete_leftovers.sh
+
+      - name: Run cleanup engine (DRY RUN)
+        run: |
+          ./scripts/delete_leftovers.sh

@@ -9,9 +9,10 @@ data "aws_eks_cluster_auth" "this" {
 data "aws_caller_identity" "current" {}
 
 data "aws_route53_zone" "main" {
-  name         = var.root_domain
+  name         = var.main_domain
   private_zone = false
 }
+
 
 ############################################
 # NETWORK
@@ -20,16 +21,17 @@ data "aws_route53_zone" "main" {
 module "network" {
   source = "./modules/network"
 
-  name     = local.name_prefix
-  vpc_cidr = "10.0.0.0/16"
+  name         = local.name_prefix
+  cluster_name = local.cluster_name
+  vpc_cidr     = "10.0.0.0/16"
+  azs          = ["us-east-1a", "us-east-1b"]
 
-  azs = ["us-east-1a", "us-east-1b"]
-
-  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
-  private_subnets = ["10.0.11.0/24", "10.0.12.0/24"]
-  vpc_flow_log    = local.vpc_flow_log
+  public_subnets   = ["10.0.1.0/24", "10.0.2.0/24"]
+  private_subnets  = ["10.0.11.0/24", "10.0.12.0/24"]
+  vpc_flow_log_arn = module.logging.log_group_arns["vpc_flow_log"]
   tags = merge(local.common_tags, {
-    Name = local.name_prefix
+    layer = "network"
+    name  = local.name_prefix
   })
 }
 
@@ -65,9 +67,12 @@ module "security" {
   vpc_id         = module.network.vpc_id
   sg_definitions = module.sg_prep.sg_definitions
 
-  name_prefix = local.name_prefix
-
-  tags = local.common_tags
+  name_prefix  = local.name_prefix
+  cluster_name = local.cluster_name
+  tags = merge(local.common_tags, {
+    resource-type = "security-group"
+    layer         = "security"
+  })
 }
 
 ############################################
@@ -76,7 +81,12 @@ module "security" {
 module "iam_core" {
   source       = "./modules/iam-core"
   cluster_name = local.cluster_name
-  tags         = local.common_tags
+  account_id   = var.account_id
+  tags = merge(local.common_tags, {
+    resource-type = "iam"
+    layer         = "identity"
+    step          = "base"
+  })
 }
 
 # Roles
@@ -90,8 +100,11 @@ module "iam_irsa" {
   hosted_zone_id    = data.aws_route53_zone.main.zone_id
   account_id        = data.aws_caller_identity.current.account_id
 
-  tags = local.common_tags
-
+  tags = merge(local.common_tags, {
+    resource-type = "iam"
+    layer         = "identity"
+    step          = "extra"
+  })
   depends_on = [module.eks]
 }
 
@@ -103,25 +116,38 @@ module "eks" {
 
   cluster_name       = local.cluster_name
   kubernetes_version = var.kubernetes_v
-
   vpc_id             = module.network.vpc_id
   private_subnet_ids = module.network.private_subnet_ids
+  sg_ids             = module.security.sg_ids
 
-  sg_ids = module.security.sg_ids
+  cluster_role_arn  = module.iam_core.eks_cluster_role_arn
+  node_role_arn     = module.iam_core.node_group_role_arn
+  fargate_role_arn  = module.iam_core.fargate_role_arn
+  fargate_workloads = local.fargate_workloads
+  #sys_monitor_ec2_role_arn                   = module.iam_core.sys_monitor_ec2_role_arn
+  sys_monitor_eks_cross_account_role_arn = module.iam_core.sys_monitor_eks_cross_account_role
 
-  cluster_role_arn = module.iam_core.eks_cluster_role_arn
-  node_role_arn    = module.iam_core.node_group_role_arn
-  fargate_role_arn = module.iam_core.fargate_role_arn
-  access_iam_arn   = var.access_iam_arn
+  access_iam_arn = var.access_iam_arn
+  admin_arn      = var.admin_arn
 
-  node_instance_type    = "t3.medium"
-  node_desired_capacity = 2
-  node_min_capacity     = 1
-  node_max_capacity     = 3
+  node_instance_type    = local.app_nodes.node_instance_type
+  node_desired_capacity = local.app_nodes.node_desired_capacity
+  node_min_capacity     = local.app_nodes.node_min_capacity
+  node_max_capacity     = local.app_nodes.node_max_capacity
 
-  tags = local.common_tags
+  sys_node_instance_type    = local.sys_nodes.node_instance_type
+  sys_node_desired_capacity = local.sys_nodes.node_desired_capacity
+  sys_node_min_capacity     = local.sys_nodes.node_min_capacity
+  sys_node_max_capacity     = local.sys_nodes.node_max_capacity
+
+  tags = merge(local.common_tags, {
+    layer        = "compute"
+    cluster-role = "control-plane"
+  })
+
   depends_on = [
-    module.logging
+    module.logging,
+    module.network
   ]
 }
 
@@ -130,10 +156,15 @@ module "eks" {
 ############################################
 
 module "logging" {
-  source      = "./modules/logging"
-  log_groups  = local.app_log_groups
-  name_prefix = local.name_prefix
-  tags        = local.common_tags
+  source       = "./modules/logging"
+  log_groups   = local.app_log_groups
+  name_prefix  = local.name_prefix
+  cluster_name = local.cluster_name
+
+  tags = merge(local.common_tags, {
+    resource-type = "cloudwatch"
+    layer         = "observability"
+  })
 }
 
 ############################################
@@ -142,20 +173,28 @@ module "logging" {
 module "efs" {
   source = "./modules/efs"
 
-  vpc_id      = module.network.vpc_id
-  vpc_cidr    = "10.0.0.0/16"
-  name_prefix = local.name_prefix
-  subnet_ids  = module.network.private_subnet_ids
-  tags        = local.common_tags
+  vpc_id       = module.network.vpc_id
+  vpc_cidr     = "10.0.0.0/16"
+  name_prefix  = local.name_prefix
+  cluster_name = local.cluster_name
+  subnet_ids   = module.network.private_subnet_ids
+  tags = merge(local.common_tags, {
+    resource-type = "efs"
+    layer         = "storage"
+  })
+  #efs_access_points = local.efs_access_points
 }
 
 ############################################
-# ECR
+# ACM
 ############################################
-#module "ecr" {
-#  source = "./modules/ecr"
-#  name_prefix = local.name_prefix
-#  repositories = ["user", "admin", "monitoring"]
-#  tags = local.common_tags
-#}
+module "acm" {
+  source  = "./modules/acm"
+  domain  = local.main_domain
+  zone_id = data.aws_route53_zone.main.zone_id
+  tags = merge(local.common_tags, {
+    resource-type = "acm"
+    layer         = "routing"
+  })
+}
 

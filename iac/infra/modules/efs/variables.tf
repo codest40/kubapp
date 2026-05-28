@@ -18,3 +18,15 @@ variable "tags" {
 variable "name_prefix" {
   type = string
 }
+
+variable "cluster_name" {
+  type = string
+}
+
+#variable "efs_access_points" {
+#  type = map(object({
+#    path = string
+#    uid  = number
+#    gid  = number
+#  }))
+#}
