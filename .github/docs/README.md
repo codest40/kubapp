@@ -309,7 +309,7 @@
 # without running full build pipeline.
 
 # ------------------------------------------------------------
-# LAYER 13 — FIXER WORKFLOW (fixer.yml).. Experimental Reason
+# LAYER 13 — FIXER WORKFLOW (fixer.yml).. For Experimental Reasons, not a major parht of project
 # ------------------------------------------------------------
 
 # Emergency operational command runner for cluster + Terraform. 
