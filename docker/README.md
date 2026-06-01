@@ -67,7 +67,7 @@ The platform also supports mixed compute models, allowing services to run on eit
 - EC2-backed nodes
 - AWS Fargate
 
-depending on workload requirements.
+depending on workload requirements. for e.g workloads that require stricter, fine-grained control over security, compliance, and runtime configuration such as transaction apps can run on ec2, else on fargate, if apps is primarily user-facing or stateless services.
 
 ---
 
