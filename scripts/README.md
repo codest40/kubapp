@@ -49,17 +49,6 @@ Bootstraps ArgoCD resources into the cluster.
 * Displays cluster and application state
 * Performs dry-run preview before apply
 
-### `argocd_login.sh`
-
-Handles authentication and token generation for ArgoCD.
-
-**Responsibilities:**
-
-* Retrieves initial admin password from Kubernetes secret
-* Logs into ArgoCD CLI
-* Updates password for service account
-* Generates access tokens
-
 ---
 
 ## 3. Kubernetes Cluster Management
@@ -180,10 +169,6 @@ Generates Kubernetes secrets dynamically.
 ### `find.sh`
 
 Search and inspection utility for scripts and configs.
-
-### `functions/`
-
-Shared helper functions used across scripts.
 
 ---
 

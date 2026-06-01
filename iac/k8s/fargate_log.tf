@@ -1,3 +1,5 @@
+# Log Definitons to be used by fargate apps
+
 resource "kubernetes_config_map_v1" "fargate_logging" {
   metadata {
     name      = "aws-logging"
