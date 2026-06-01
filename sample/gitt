@@ -1,3 +1,0 @@
-git rm --cached xyz
-git add .
-git commit --amend --no-edit

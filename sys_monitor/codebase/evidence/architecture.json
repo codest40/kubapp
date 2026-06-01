@@ -1,0 +1,83 @@
+{
+  "module": "architecture",
+  "script": "architecture.sh",
+  "status": "completed",
+  "timestamp": "2026-05-31T20:48:00Z",
+
+  "summary": {
+    "total_checked": 248,
+    "issues_found": 11,
+    "critical": 0,
+    "warnings": 11,
+    "architecture_score": 67
+  },
+
+  "findings": [
+  {
+    "severity": "warning",
+    "type": "boundary",
+    "area": "sys_monitor",
+    "message": "cloud logic inside monitoring layer"
+  },
+  {
+    "severity": "warning",
+    "type": "boundary",
+    "area": "sys_monitor",
+    "message": "cloud logic inside monitoring layer"
+  },
+  {
+    "severity": "warning",
+    "type": "boundary",
+    "area": "sys_monitor",
+    "message": "cloud logic inside monitoring layer"
+  },
+  {
+    "severity": "warning",
+    "type": "boundary",
+    "area": "sys_monitor",
+    "message": "cloud logic inside monitoring layer"
+  },
+  {
+    "severity": "warning",
+    "type": "boundary",
+    "area": "sys_monitor",
+    "message": "cloud logic inside monitoring layer"
+  },
+  {
+    "severity": "warning",
+    "type": "duplication",
+    "area": "scripts",
+    "message": "multiple find tools detected"
+  },
+  {
+    "severity": "warning",
+    "type": "duplication",
+    "area": "scripts",
+    "message": "multiple validate tools detected"
+  },
+  {
+    "severity": "warning",
+    "type": "coupling",
+    "area": "scripts",
+    "message": "iac coupling detected"
+  },
+  {
+    "severity": "warning",
+    "type": "coupling",
+    "area": "scripts",
+    "message": "iac coupling detected"
+  },
+  {
+    "severity": "warning",
+    "type": "coupling",
+    "area": "scripts",
+    "message": "iac coupling detected"
+  },
+  {
+    "severity": "warning",
+    "type": "coupling",
+    "area": "scripts",
+    "message": "iac coupling detected"
+  }
+]
+}

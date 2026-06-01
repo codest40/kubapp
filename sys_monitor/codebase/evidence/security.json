@@ -1,0 +1,91 @@
+{
+  "module": "security",
+  "script": "security.sh",
+  "timestamp": "2026-05-31T20:48:00Z",
+  "status": "fail",
+
+  "summary": {
+    "total_checked": 482,
+    "findings": 10,
+    "errors": 8,
+    "warnings": 2
+  },
+
+  "errors": [
+  "plaintext_tfvars: /home/codest/Main/devops/kubapp/sys_monitor/cloud/aws/terraform.tfvars",
+  "plaintext_tfvars: /home/codest/Main/devops/kubapp/sys_monitor/cloud/aws/boot/terraform.tfvars",
+  "plaintext_tfvars: /home/codest/Main/devops/kubapp/iac/k8s/envs/prod/k8s.tfvars",
+  "plaintext_tfvars: /home/codest/Main/devops/kubapp/iac/k8s/envs/dev/k8s.tfvars",
+  "plaintext_tfvars: /home/codest/Main/devops/kubapp/iac/infra/envs/prod/infra.tfvars",
+  "plaintext_tfvars: /home/codest/Main/devops/kubapp/iac/infra/envs/dev/infra.tfvars",
+  "plaintext_tfvars: /home/codest/Main/devops/kubapp/iac/manifests/envs/dev/manifests.tfvars",
+  "plaintext_tfvars: /home/codest/Main/devops/kubapp/iac/boot/terraform.tfvars"
+],
+  "warnings": [
+  "secret_manifest_location: gitops/charts/postgres/templates/secret.yaml",
+  "plaintext_credential: scripts/create_values.sh"
+],
+
+  "findings": [
+  {
+    "severity": "critical",
+    "type": "plaintext_tfvars",
+    "file": "/home/codest/Main/devops/kubapp/sys_monitor/cloud/aws/terraform.tfvars",
+    "message": "plaintext tfvars file detected"
+  },
+  {
+    "severity": "critical",
+    "type": "plaintext_tfvars",
+    "file": "/home/codest/Main/devops/kubapp/sys_monitor/cloud/aws/boot/terraform.tfvars",
+    "message": "plaintext tfvars file detected"
+  },
+  {
+    "severity": "critical",
+    "type": "plaintext_tfvars",
+    "file": "/home/codest/Main/devops/kubapp/iac/k8s/envs/prod/k8s.tfvars",
+    "message": "plaintext tfvars file detected"
+  },
+  {
+    "severity": "critical",
+    "type": "plaintext_tfvars",
+    "file": "/home/codest/Main/devops/kubapp/iac/k8s/envs/dev/k8s.tfvars",
+    "message": "plaintext tfvars file detected"
+  },
+  {
+    "severity": "critical",
+    "type": "plaintext_tfvars",
+    "file": "/home/codest/Main/devops/kubapp/iac/infra/envs/prod/infra.tfvars",
+    "message": "plaintext tfvars file detected"
+  },
+  {
+    "severity": "critical",
+    "type": "plaintext_tfvars",
+    "file": "/home/codest/Main/devops/kubapp/iac/infra/envs/dev/infra.tfvars",
+    "message": "plaintext tfvars file detected"
+  },
+  {
+    "severity": "critical",
+    "type": "plaintext_tfvars",
+    "file": "/home/codest/Main/devops/kubapp/iac/manifests/envs/dev/manifests.tfvars",
+    "message": "plaintext tfvars file detected"
+  },
+  {
+    "severity": "critical",
+    "type": "plaintext_tfvars",
+    "file": "/home/codest/Main/devops/kubapp/iac/boot/terraform.tfvars",
+    "message": "plaintext tfvars file detected"
+  },
+  {
+    "severity": "warning",
+    "type": "secret_manifest_location",
+    "file": "gitops/charts/postgres/templates/secret.yaml",
+    "message": "kubernetes secret manifest outside approved gitops/secrets path"
+  },
+  {
+    "severity": "warning",
+    "type": "plaintext_credential",
+    "file": "scripts/create_values.sh",
+    "message": "possible plaintext credential detected"
+  }
+]
+}

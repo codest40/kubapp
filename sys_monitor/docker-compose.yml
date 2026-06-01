@@ -22,6 +22,7 @@ services:
     container_name: prometheus
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml
     ports:
       - "9090:9090"
     healthcheck:
@@ -76,6 +77,15 @@ services:
       - "9105:9105"
     env_file:
       - ./.env
+    restart: unless-stopped
+
+  codebase-exporter:
+    build: ./codebase/runners
+    container_name: codebase-exporter
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./codebase/evidence:/evidence
     restart: unless-stopped
 
 volumes:

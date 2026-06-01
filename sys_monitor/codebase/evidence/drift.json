@@ -1,0 +1,18 @@
+{
+  "module": "drift",
+  "script": "drift.sh",
+  "timestamp": "2026-05-31T20:47:58Z",
+  "status": "pass",
+
+  "summary": {
+    "total_checked": 736,
+    "findings": 0,
+    "errors": 0,
+    "warnings": 0
+  },
+
+  "errors": [],
+  "warnings": [],
+
+  "findings": []
+}

@@ -1,7 +1,0 @@
-plane: gitops
-managed-by: argocd
-gitops-tool: argocd
-component: application | ingress | platform
-workload: user | admin | ingress
-environment: dev | prod
-project: kubapp
