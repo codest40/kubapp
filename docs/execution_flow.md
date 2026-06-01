@@ -67,7 +67,7 @@
 # Terraform is the foundation layer.
 
 # ------------------------------------------------------------
-# 1. INFRASTRUCTURE BOOTSTRAP (TERRAFORM ORIGIN)
+# 1. INFRASTRUCTURE BOOTSTRAP (TERRAFORM ORIGIN) iac/infra
 # ------------------------------------------------------------
 
 # Everything begins with infrastructure provisioning.
@@ -94,7 +94,7 @@
 
 
 # ------------------------------------------------------------
-# 2. GITOPS CONTROL PLANE ACTIVATION (BOOTSTRAP PHASE)
+# 2. GITOPS CONTROL PLANE ACTIVATION (BOOTSTRAP PHASE)  iac/k8s + iac/manifests
 # ------------------------------------------------------------
 
 # Once the cluster exists, it is transformed into a GitOps system.
@@ -118,7 +118,7 @@
 
 
 # ------------------------------------------------------------
-# 3. APPLICATION BUILD PHASE (ARTIFACT GENERATION)
+# 3. APPLICATION BUILD PHASE (ARTIFACT GENERATION)   build.yml
 # ------------------------------------------------------------
 
 # The system now moves from infrastructure to workload creation.
@@ -176,7 +176,7 @@
 
 
 # ------------------------------------------------------------
-# 5. GITOPS MATERIALIZATION (HELM + CONFIG RENDERING)
+# 5. GITOPS MATERIALIZATION (HELM + CONFIG RENDERING)  add_new_app.yml
 # ------------------------------------------------------------
 
 # Registry entries are transformed into deployable manifests:
@@ -192,15 +192,13 @@
 
 # Important constraint:
 
-# This is still NOT deployment.
-
 # This is state compilation.
 
 # Git is updated → ArgoCD observes → Kubernetes will later converge
 
 
 # ------------------------------------------------------------
-# 6. RECONCILIATION ENGINE (ARGOCD ACTIVATION LOOP)
+# 6. RECONCILIATION ENGINE (ARGOCD ACTIVATION LOOP)   setup_argocd.yml
 # ------------------------------------------------------------
 
 # ArgoCD continuously watches:
@@ -231,7 +229,7 @@
 # The ingress layer enforces:
 
 # - every registered service must be routable
-# - no orphan routes are allowed
+# - no orphan routes are allowed (remove_svc.yml ensures that)
 # - registry is authoritative for traffic mapping
 
 # Validation outcomes:
