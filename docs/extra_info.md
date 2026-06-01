@@ -1,8 +1,7 @@
 
+# Advancement paths for kubapp
 - Ai intergration for analysis
-- Real domain (Cloudfront + WAF +  ACM properly)
-- Autoscaling (node scaller+ HPA / Karpenter)
--  Observability (Prometheus + Grafana)+
+- Edge security (Cloudfront + WAF)
 - Smart scheduling (advanced routing rules)+
 
 
