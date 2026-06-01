@@ -8,9 +8,13 @@
 
 # The execution model is:
 
-#   Terraform → Build → Registry → GitOps → ArgoCD
-#        ↑        ↑                                ↑
-#   Snapshot ← Verification ← Cluster ← Reconcile ←┘
+```bash
+   Terraform → Build → Registry → GitOps → ArgoCD
+        ↑        ↑                                ↑
+   Snapshot ← Verification ← Cluster ← Reconcile ←┘
+```
+
+```bash
 #
 1. Laptop push
       ↓
@@ -53,7 +57,7 @@
    - checks health
    - triggers rollback via Git tag switch
 
-
+```
 
 # Every stage is deterministic, reversible, and observable.
 
