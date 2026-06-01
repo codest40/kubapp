@@ -19,7 +19,7 @@ Each Section of the project has its own readme file, so this is outline.
 - Automated provisioning
 - Operational simplicity
 
-## Documentation
+## Extra Documentation
 
 - [Architecture](docs/architecture.md)
 - [Operations](docs/execution_flow.md)
@@ -27,21 +27,6 @@ Each Section of the project has its own readme file, so this is outline.
 - [Observability](docs/observability.md)
 - [GitOps](docs/gitops.md)
 - [Information](docs/extra_info.md)
-
-
-## Tools Used
-
-- Kubernetes
-- Terraform
-- Helm
-- AWS EKS
-- Docker
-- GitHub Actions
-- Prometheus
-- Grafana
-- Argocd
-- Route53
-- IAM / STS
 
 
 ## Repository Structure
