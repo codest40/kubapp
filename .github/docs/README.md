@@ -1,6 +1,4 @@
-# ============================================================
 # KubApp — GitOps Workflows Layer (ArgoCD + CI/CD Control Plane)
-# ============================================================
 
 # ------------------------------------------------------------
 # OVERVIEW — WHAT THIS SYSTEM IS
@@ -311,10 +309,10 @@
 # without running full build pipeline.
 
 # ------------------------------------------------------------
-# LAYER 13 — FIXER WORKFLOW (fixer.yml)
+# LAYER 13 — FIXER WORKFLOW (fixer.yml).. Experimental Reason
 # ------------------------------------------------------------
 
-# Emergency operational command runner for cluster + Terraform.
+# Emergency operational command runner for cluster + Terraform. 
 
 # Responsibilities:
 # - Accepts arbitrary multi-line commands
@@ -325,7 +323,6 @@
 # Purpose:
 # On-demand debugging and incident response tool for engineers.
 
-# WARNING:
 # Extremely powerful — effectively a remote execution console
 # for platform recovery and diagnostics.
 
