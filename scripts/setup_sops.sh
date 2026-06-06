@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+SOPS_PATH="$HOME/.config/sops/age"
+SOPS_FILE="$HOME/.config/sops/age/keys.txt"
+
 install_sops() {
   if command -v sops >/dev/null 2>&1; then
     echo "sops already installed"
@@ -24,16 +27,17 @@ install_age() {
 }
 
 ensure_age_key() {
-  mkdir -p "$HOME/.age"
+  echo "Using PATH for SOPS: $SOPS_PATH"
+  mkdir -p "$SOPS_PATH"
 
-  if [ ! -f "$HOME/.age/age.key" ]; then
+  if [ ! -f "$SOPS_FILE" ]; then
     echo "Creating AGE key..."
-    age-keygen -o "$HOME/.age/age.key"
+    age-keygen -o "$SOPS_FILE"
   else
     echo "AGE key exists"
   fi
 }
 
 get_age_public_key() {
-  grep -oE 'age1[a-z0-9]+' "$HOME/.age/age.key"
+  grep -oE 'age1[a-z0-9]+' "$SOPS_FILE"
 }

@@ -127,6 +127,7 @@ terraform.tfvars.json
 # Plan files
 *.tfplan
 *.out
+*.tfvars
 
 # Crash logs
 crash.log
