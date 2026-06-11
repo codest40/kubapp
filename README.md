@@ -9,7 +9,7 @@ Each Section of the project has its own readme file, so this is outline.
 - Simplify cloud-native operations without overengineering the architecture
 - Enable reproducible deployments through Infrastructure as Code and GitOps workflows
 - Improve operational visibility with integrated monitoring and observability
-- Provide a maintainable platform that is easy to operate, debug, and extend
+- Provide a maintainable file-based platform that is easy to operate, debug, and extend
 
 ## The project focuses on:
 - Infrastructure as Code
