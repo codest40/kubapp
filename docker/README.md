@@ -2,7 +2,7 @@
 
 The `docker/` directory contains the application layer of KUBAPP.
 
-This is **not a major platform infrastructure component**. It only acts as the application store where developers place services after development. KUBAPP discovers applications here and manages those that contain a valid `Dockerfile`.
+This is **not a major platform infrastructure component**. It acts as the application store where developers place services after development. KUBAPP discovers applications here and manages those that contain a valid `Dockerfile`.
 
 The purpose of this directory is to provide a predictable structure for building and preparing applications for deployment.
 
@@ -19,79 +19,246 @@ service/
 ├── application source code
 └── runtime dependencies
 ```
+
+The platform uses this structure to discover and understand applications without requiring each service to implement its own deployment process.
+
+A service can therefore be:
+
+- built
+- validated
+- containerized
+- deployed
+- monitored
+- scaled
+- troubleshot
+
+using the same platform workflow.
+
 ---
 
-## Design Approach
+## `kubapp.yml`
 
-Kubapp keeps application deployment intentionally simple.
+Each service can define a lightweight `kubapp.yml` file containing deployment metadata.
 
-Each service defines its own lightweight `kubapp.yml` file which acts as deployment metadata for the platform. This allows the automation layer to understand:
-- compute type (EC2 or Fargate)
-- application ports
+This allows KUBAPP to understand how the application should be deployed without hardcoding application-specific logic into CI/CD pipelines or Kubernetes manifests.
+
+The metadata can describe:
+
+- compute type
+- application port
 - health endpoints
 - storage requirements
 - runtime features
 - deployment environment settings
 
-This approach avoids hardcoding deployment logic inside CI/CD pipelines or Kubernetes manifests.
+Example:
+
+```yaml
+name: transaction-api
+
+compute: ec2
+
+port: 3000
+
+health:
+  path: /health
+
+storage:
+  ephemeral: true
+```
+
+The exact schema is defined by the KUBAPP deployment automation.
 
 ---
 
-## Standardized Service Structure
+## Compute Selection
 
-All applications follow a similar structure:
+KUBAPP supports multiple compute models.
 
-```text
-service/
-├── Dockerfile
-├── kubapp.yml
-├── application source code
-└── runtime dependencies
-```
+Applications can run on:
 
-This makes services easier to:
-- build
-- validate
-- deploy
-- monitor
-- scale
-- troubleshoot
+- EC2-backed Kubernetes nodes
+- AWS Fargate
 
-without creating separate deployment patterns for every application.
+The choice depends on the workload.
+
+### EC2
+
+EC2-backed nodes are appropriate when an application requires greater control over:
+
+- runtime configuration
+- security
+- networking
+- storage
+- node-level behavior
+- workload isolation
+
+For example, transaction-processing workloads may require the additional control provided by EC2-backed nodes.
+
+### Fargate
+
+Fargate is suitable for workloads that are primarily:
+
+- user-facing
+- stateless
+- lightweight
+- independently scalable
+
+This allows KUBAPP to use different compute models without changing the application's basic deployment workflow.
 
 ---
 
 ## Runtime Configuration
 
-Applications are designed to be Kubernetes-ready from the start.
+Applications are designed to be Kubernetes-ready from the beginning.
 
-The deployment metadata supports:
-- health and liveness endpoints
+Deployment metadata can describe runtime requirements such as:
+
+- readiness and liveness endpoints
+- container ports
 - ephemeral storage
 - container security settings
-- optional ServiceMonitor integration
-- environment-aware deployments
+- environment-specific configuration
+- optional Prometheus `ServiceMonitor` integration
 
-The platform also supports mixed compute models, allowing services to run on either:
-- EC2-backed nodes
-- AWS Fargate
-
-depending on workload requirements. for e.g workloads that require stricter, fine-grained control over security, compliance, and runtime configuration such as transaction apps can run on ec2, else on fargate, if apps is primarily user-facing or stateless services.
+The platform converts these requirements into the appropriate deployment configuration.
 
 ---
 
 ## Secrets Management
 
-Sensitive application configuration is encrypted using SOPS.
+Sensitive configuration is **not stored as plaintext** in the repository.
 
-Instead of storing plaintext credentials in the repository, secrets are managed as encrypted manifests and decrypted only during authorized deployment workflows.
+KUBAPP uses **SOPS** to encrypt sensitive configuration.
 
-This keeps the repository safer while still allowing secrets to remain version-controlled and reproducible.
+The general workflow is:
+
+```text
+Developer
+    |
+    v
+Encrypted secret
+    |
+    v
+Git repository
+    |
+    v
+Authorized deployment workflow
+    |
+    v
+Decrypt
+    |
+    v
+Kubernetes
+```
+
+Secrets remain version-controlled while their plaintext values remain protected.
+
+Decryption should only occur in authorized deployment environments.
 
 ---
 
 ## Local Development
 
-The directory also includes a local Docker Compose setup for development and testing.
+The directory also supports local development using Docker Compose.
 
-This allows services to be validated locally before entering the Kubernetes deployment workflow.
+This provides a way to:
+
+- build application containers
+- run services locally
+- test service dependencies
+- validate configuration
+- troubleshoot applications
+
+before they enter the Kubernetes deployment workflow.
+
+Typical flow:
+
+```text
+Developer
+    |
+    v
+Application development
+    |
+    v
+Docker Compose
+    |
+    v
+Local validation
+    |
+    v
+Docker image
+    |
+    v
+CI/CD
+    |
+    v
+KUBAPP deployment
+    |
+    v
+Kubernetes
+```
+
+---
+
+## Platform Boundary
+
+The `docker/` directory is intentionally kept lightweight.
+
+KUBAPP does not require developers to understand the internal platform implementation in order to package an application.
+
+Developers primarily provide:
+
+1. Application source code
+2. `Dockerfile`
+3. `kubapp.yml`
+4. Required runtime configuration
+
+The platform is responsible for the deployment mechanics.
+
+This separation keeps application development independent from the underlying infrastructure while giving the platform enough metadata to automate deployment consistently.
+
+---
+
+## Application-to-Platform Flow
+
+```text
+                    Developer
+                        |
+                        v
+                Application Source
+                        |
+                        v
+             +---------------------+
+             |      docker/        |
+             |                     |
+             | Dockerfile          |
+             | kubapp.yml          |
+             | Application Code    |
+             +----------+----------+
+                        |
+                        v
+                  CI/CD Pipeline
+                        |
+                        v
+                  Container Image
+                        |
+                        v
+                KUBAPP Platform
+                        |
+              +---------+---------+
+              |                   |
+              v                   v
+           EC2 Nodes           Fargate
+              |                   |
+              +---------+---------+
+                        |
+                        v
+                    Kubernetes
+```
+
+---
+
+## Design Goal
+The goal of the `docker/` layer is **standardization without unnecessary abstraction**.
+Applications remain independent while following a predictable contract that allows KUBAPP to discover, build, configure, and deploy them consistently.
