@@ -1,15 +1,24 @@
 # Docker
 
-This `docker/` directory contains the application layer of kubapp.
+The `docker/` directory contains the application layer of KUBAPP.
 
-Instead of treating applications as completely separate projects, kubapp standardizes how services are built, configured, and deployed. Each application follows a similar structure:
-- application source code
-- Dockerfile
-- deployment metadata
-- runtime configuration
+This is **not a major platform infrastructure component**. It only acts as the application store where developers place services after development. KUBAPP discovers applications here and manages those that contain a valid `Dockerfile`.
 
-The goal is to make onboarding and deployment predictable across services without introducing heavy platform abstractions.
+The purpose of this directory is to provide a predictable structure for building and preparing applications for deployment.
 
+---
+
+## Application Structure
+
+Each application follows a standardized structure:
+
+```text
+service/
+├── Dockerfile
+├── kubapp.yml
+├── application source code
+└── runtime dependencies
+```
 ---
 
 ## Design Approach
@@ -30,7 +39,7 @@ This approach avoids hardcoding deployment logic inside CI/CD pipelines or Kuber
 
 ## Standardized Service Structure
 
-Most applications follow a similar structure:
+All applications follow a similar structure:
 
 ```text
 service/
