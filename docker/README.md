@@ -41,7 +41,6 @@ using the same platform workflow.
 Each service can define a lightweight `kubapp.yml` file containing deployment metadata.
 
 This allows KUBAPP to understand how the application should be deployed without hardcoding application-specific logic into CI/CD pipelines or Kubernetes manifests.
-
 The metadata can describe:
 
 - compute type
@@ -107,6 +106,52 @@ Fargate is suitable for workloads that are primarily:
 This allows KUBAPP to use different compute models without changing the application's basic deployment workflow.
 
 ---
+
+## Default Configuration
+
+A `kubapp.yml` file is **not a Must**.
+
+If an application contains a valid `Dockerfile` but does not provide a `kubapp.yml`, KUBAPP will still attempt to manage the application using the platform's default configuration.
+
+This allows applications to be onboarded with minimal configuration.
+
+```text
+Valid Dockerfile
+       |
+       v
+Application discovered
+       |
+       v
+kubapp.yml exists?
+    /          \
+  Yes           No
+   |             |
+   v             v
+Custom         Platform
+Config         Defaults
+   |             |
+   +------+------+
+          |
+          v
+      KUBAPP manages
+        application
+```
+
+However, relying on the default configuration may not be appropriate for every workload.
+Applications with specific runtime requirements may require explicit configuration to operate efficiently.
+
+For example, an application may need:
+
+- a specific compute model
+- non-default resource limits
+- custom health endpoints
+- specific ports
+- persistent storage
+- special security settings
+- workload-specific scheduling
+- environment-specific configuration
+
+In these cases, providing a `kubapp.yml` allows the application to communicate its requirements to the platform.
 
 ## Runtime Configuration
 
