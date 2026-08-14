@@ -29,7 +29,7 @@ Each Section of the project has its own readme file, so this is outline.
 - [Information](docs/extra_info.md)
 
 
-## Repository Structure
+## Full Repository Structure
 
 ```text
 kubapp/
