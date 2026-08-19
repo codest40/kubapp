@@ -3,7 +3,7 @@ namespace: dev
 serviceAccount:
   create: true
   name: admin-sa
-  roleArn: arn:aws:iam::198200019771:role/kubapp-dev-app-pods-role
+  roleArn: arn:aws:iam::532918215760:role/kubapp-dev-app-pods-role
 serviceMonitor:
   enabled: false
   path: /metrics
@@ -11,7 +11,7 @@ serviceMonitor:
 replicaCount: 2
 image:
   repository: paragon40/admin_app
-  tag: 0acdef5f43654075a87509cae340a1c54dd628bb-1779781277
+  tag: bbf7883ba408305cf8ce5e7b5aaa994961fadfa9-1780923205
   pullPolicy: Always
 service:
   type: ClusterIP
@@ -52,14 +52,14 @@ probes:
     initialDelaySeconds: 10
     periodSeconds: 15
 hpa:
-  enabled: true
+  enabled: false
   minReplicas: 2
   maxReplicas: 4
   cpu: 70
   memory: 70
 meta:
   staticFingerprint: be9cdf8b48982e22e4b67e6b6345e115a9ffde654c29143eaf57dff2b5007ecb
-  generatedAt: 2026-05-27T11:22:16Z
+  generatedAt: 2026-06-11T11:44:21Z
   source: build-pipeline
 storage:
   volumes:

@@ -34,6 +34,7 @@ CANDIDATES=$(aws logs describe-log-groups \
 ########################################
 if [[ -z "$CANDIDATES" ]]; then
   echo "No Log Group Found"
+  exit 0
 fi
 
 for lg in $CANDIDATES; do

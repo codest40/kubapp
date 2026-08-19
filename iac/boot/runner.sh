@@ -26,8 +26,8 @@ run_apply() {
 }
 
 run_destroy() {
-
-  read -p "⚠️  DESTROY this TFSTATE, Hope you destroyed the Infra First? (yes/no): " CONFIRM
+  echo "⚠️  DESTROYING TFSTATE!!!"
+  read -p "(Dont incure unnecessary cost for yourself) Hope you destroyed that Infra First? (yes/no): " CONFIRM
   if [[ "$CONFIRM" != "yes" ]]; then
     echo "❌ Destroy cancelled Successfully."
     return 1

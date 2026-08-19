@@ -1,36 +1,83 @@
-### ------------------------------------------------------------
-# FOUNDATION LAYER (boot/)
-### ------------------------------------------------------------
+# KUBAPP — Terraform Bootstrap
 
-# Purpose:
-Our aim is to separate state entirely from the rest of infra provision so we can easily manage them.
-It Initializes Terraform remote state backend before any infra.
+The `iac/boot/` directory creates the AWS resources required to store and protect KUBAPP's Terraform state.
 
-# Components:
-# - S3 bucket → state storage
-# - DynamoDB → state locking
-# - provider configuration
-# - Terraform version pinning
+This layer must be deployed **before** the main infrastructure under [`../infra/`](../infra/).
 
-# Key files:
+## Purpose
 
-# boot/
-# ├── s3.tf
-# ├── dynamodb.tf
-# ├── provider.tf
-# ├── terraform.tfstate
-# ├── terraform.tfvars
+The bootstrap layer creates the resources required for Terraform's remote state backend.
+
+| Resource       | Purpose                              |
+| -------------- | ------------------------------------ |
+| S3 bucket      | Stores Terraform remote state        |
+| S3 versioning  | Keeps previous versions of the state |
+| S3 encryption  | Protects state data at rest          |
+| DynamoDB table | Provides Terraform state locking     |
+
+This prevents the main infrastructure from depending on a local Terraform state file.
+
+## Architecture
+
+```text
+iac/boot/
+    │
+    ├── S3
+    │    ├── Remote Terraform State
+    │    ├── Versioning
+    │    └── Encryption
+    │
+    └── DynamoDB
+         └── State Locking
+              │
+              ▼
+        iac/infra/
+              │
+              ▼
+       KUBAPP Infrastructure
+```
+
+## Files
+
+| File           | Responsibility                                                                            |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| `s3.tf`        | Creates and configures the Terraform state bucket                                         |
+| `dynamodb.tf`  | Creates the state-locking table                                                           |
+| `variables.tf` | Defines bootstrap configuration such as AWS region, profile, bucket, and lock table names |
+| `provider.tf`  | Configures the AWS provider used to create the bootstrap resources                        |
+| `version.tf`   | Defines the required Terraform version                                                    |
+| `outputs.tf`   | Exposes the backend resource names and region for reference or automation                 |
+| `runner.sh`    | Provides the bootstrap execution workflow                                                 |
+
+## Deployment Order
+
+The bootstrap layer is intentionally separate from the main infrastructure:
+
+```text
+1. iac/boot/
+       │
+       ▼
+2. Terraform backend exists
+       │
+       ▼
+3. iac/infra/
+       │
+       ▼
+4. KUBAPP platform infrastructure
+```
+
+The bootstrap layer is normally created once and changed less frequently than the main infrastructure.
+
+## Design Goal
+
+Keep the bootstrap layer **small, stable, and independent**.
+Its only responsibility is to provide the Terraform backend foundation that allows the rest of KUBAPP's infrastructure to be managed safely.
 
 
-# Execution flow:
+## For Users
+If you intend to provision infra using this layer, then you must first create a terraform.tfvars here and supply
+- profile           = "aws-accout-profile"
+- state_bucket_name = "s3-bukcet-name"
+- lock_table_name   = "and-lock-name"
 
-# terraform init
-# terraform apply
-
-# Guarantees:
-
-# - Remote state storage enabled
-# - State locking enabled
-# - Multi-user safety
-# - No local state dependency
-
+- Then **bash runner.sh** takes over

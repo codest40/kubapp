@@ -1,7 +1,7 @@
 from flask import Flask, Response, jsonify
 import os
 
-METRICS_FILE = os.getenv("METRICS_FILE", "/evidence/metrics.prom")
+METRICS_FILE = os.getenv("METRICS_FILE", "../../evidence/metrics.prom")
 
 app = Flask(__name__)
 if METRICS_FILE:
@@ -35,7 +35,7 @@ def dashboard():
         </head>
 
         <body>
-            <h1> KubApp SysMonitor </h1>
+            <h1> KubApp SysMonitor CodebBase </h1>
 
             <div class="box">
                 <h2>Status</h2>
@@ -57,7 +57,7 @@ def dashboard():
 def health():
     return jsonify({
         "status": "ok",
-        "service": "kubapp-sysmonitor"
+        "service": "kubapp-sysmonitor [codebase]"
     }), 200
 
 # PROMETHEUS METRICS

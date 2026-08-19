@@ -29,9 +29,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      #- name: Check AWS credentials
-      #  run: aws sts get-caller-identity
-
       - name: Install SOPS
         run: |
           curl -L -o sops https://github.com/getsops/sops/releases/download/v3.9.0/sops-v3.9.0.linux.amd64
@@ -47,6 +44,16 @@ jobs:
             echo "❌ AGE key missing"
             exit 1
           }
+
+          echo "============================================"
+          echo "Running DEBUG: "
+          #which sops
+          #file $(which sops)
+          #head -5 $(which sops)
+          # echo "Check AWS credentials"
+          # aws sts get-caller-identity
+
+          echo "============================================"
 
       # --------------------------------
       #  Setup kubeconfig (EKS access)

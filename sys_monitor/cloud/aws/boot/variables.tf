@@ -7,6 +7,7 @@ variable "profile" {
 variable "region" {
   description = "AWS region for backend resources"
   type        = string
+  default     = "us-east-1"
 }
 
 variable "state_bucket_name" {

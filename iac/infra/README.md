@@ -1,269 +1,138 @@
-# KUBAPP — INFRASTRUCTURE LAYER (BASE TERRAFORM)
+# KUBAPP — Infrastructure
 
-### ------------------------------------------------------------
-# OVERVIEW
-### ------------------------------------------------------------
-# KubApp infrastructure is built on AWS using Terraform.
-#
-# It is designed as a production-style platform foundation
-# for running Kubernetes workloads with:
-#
-# - clear separation of concerns
-# - multi-environment support (dev, prod, etc.)
-# - secure networking
-# - workload identity (IRSA)
-# - built-in observability
-#
-# The system follows a layered architecture:
-#
-# Network → Security → IAM → Compute (EKS) → Storage → Observability → Edge
+The `infra/` directory contains the **AWS infrastructure foundation** for KUBAPP, managed entirely with Terraform.
 
+Its purpose is to provision the cloud environment required to run and operate KUBAPP's Kubernetes platform in a consistent, repeatable, and secure way.
 
-# ------------------------------------------------------------
-# HIGH-LEVEL ARCHITECTURE
-# ------------------------------------------------------------
-# The infrastructure is split into modular Terraform components:
-#
-# network   → VPC, subnets, routing, NAT
-# security  → security groups for workloads
-# iam-core  → base IAM roles for EKS
-# iam-irsa  → workload-level AWS permissions (IRSA)
-# eks       → Kubernetes cluster, nodes, fargate
-# efs       → shared persistent storage
-# ecr       → container registry (images)
-# acm       → TLS certificates for HTTPS
-# logging   → CloudWatch logs
-#
-# Each module is independent but connected through main.tf
+## Purpose
 
+The infrastructure layer provides the foundation on which the rest of KUBAPP runs.
 
-# ------------------------------------------------------------
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------
+It is responsible for:
 
-# 3.1 Modular Design
-# Each infrastructure domain is isolated in its own module.
-#
-# This makes the system:
-# - easier to maintain
-# - easier to extend
-# - safer to change
+* AWS networking
+* Network security
+* AWS and Kubernetes identity
+* EKS compute
+* Persistent storage
+* TLS and DNS integration
+* Centralized logging
 
+The infrastructure is designed to keep these responsibilities separated into reusable Terraform modules.
 
-# 3.2 Multi-Environment Support
-# Environments are separated using:
-#
-# envs/dev
-# envs/prod
-#
-# Each environment has:
-# - its own Terraform variables
-# - its own backend state (S3)
-#
-# This prevents cross-environment risk.
+## Architecture
 
+At a high level, the infrastructure follows this structure:
 
-# 3.3 Secure State Management
-# Terraform state is stored in S3:
-#
-# - encrypted state
-# - remote backend
-# - environment-based keys
-#
-# This ensures:
-# - state is not local
-# - safe team collaboration
-# - no accidental overwrites
+```text
+                    AWS
+                     │
+                     ▼
+                  Network
+                     │
+             ┌───────┴───────┐
+             ▼               ▼
+          Security          IAM
+             │               │
+             └───────┬───────┘
+                     ▼
+                    EKS
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+        EC2       Fargate     Storage
+                                 │
+                                 ▼
+                                EFS
 
+       Logging ─────────────► Observability
+       ACM / DNS ───────────► HTTPS / Edge
+```
 
-# ------------------------------------------------------------
-# CORE INFRASTRUCTURE LAYERS
-# ------------------------------------------------------------
+Each area is implemented as an independent Terraform module and connected through the root infrastructure configuration.
 
-# ------------------------------------------------------------
-# 4.1 NETWORK LAYER
-# ------------------------------------------------------------
-# The network module builds the base AWS VPC:
-#
-# VPC: 10.0.0.0/16
-# Public subnets  → internet-facing resources
-# Private subnets  → workloads (EKS, services)
-# NAT Gateway      → controlled outbound internet
-# Internet Gateway → public access
-#
-# Also includes:
-# - Route tables
-# - Subnet tagging for Kubernetes discovery
-# - VPC Flow Logs → CloudWatch
-#
-# Purpose:
-# Provides isolated and controlled network for the platform.
+## Design Goals
 
+### Modular
 
-# ------------------------------------------------------------
-# 4.2 SECURITY LAYER
-# ------------------------------------------------------------
-# Security groups are not manually defined per service.
-#
-# Instead:
-# - sg-prep module defines workload rules
-# - security module generates AWS security groups
-#
-# This allows:
-# - reusable network rules
-# - consistent port control
-# - service-to-service communication rules
-#
-# Purpose:
-# Controls all traffic between workloads in a structured way.
+Infrastructure responsibilities are separated into focused Terraform modules.
 
+This makes the platform easier to understand, maintain, and extend.
 
-# ------------------------------------------------------------
-# 4.3 IAM LAYER
-# ------------------------------------------------------------
+### Secure
 
-# iam-core
-# - EKS cluster role
-# - EC2 node group role
-# - Fargate role
-#
-# Enables Kubernetes to run on AWS securely.
+Workloads run within controlled network boundaries, while AWS permissions are separated by role and workload identity.
 
+### Reproducible
 
-# iam-irsa (Workload Identity)
-# Provides IAM roles for Kubernetes workloads using OIDC.
-#
-# Used by:
-# - AWS Load Balancer Controller
-# - ExternalDNS
-# - EFS CSI driver
-# - Fluent Bit logging
-#
-# Key idea:
-# Pods get AWS permissions without storing AWS keys.
+The entire infrastructure is defined as code, allowing environments to be provisioned consistently rather than manually configured.
 
+### Environment-Aware
 
-# ------------------------------------------------------------
-# 4.4 COMPUTE LAYER (EKS)
-# ------------------------------------------------------------
-# Core runtime layer:
-#
-# - EKS managed Kubernetes cluster
-# - EC2 node group (worker nodes)
-# - Fargate profiles (serverless pods)
-#
-# Features:
-# - private subnet deployment
-# - API + config map authentication
-# - cluster logging enabled
-# - OIDC provider enabled for IRSA
-#
-# Purpose:
-# Runs all container workloads in Kubernetes.
+KUBAPP supports different deployment environments such as `dev`, `staging`, and `prod` through Terraform configuration and environment-specific state.
 
+### Production-Oriented
 
-# ------------------------------------------------------------
-# 4.5 STORAGE LAYER (EFS)
-# ------------------------------------------------------------
-# EFS provides shared storage for Kubernetes workloads.
-#
-# Features:
-# - encrypted file system
-# - mount targets in private subnets
-# - access points per workload:
-#   - user app
-#   - admin app
-#   - monitoring
-#
-# Purpose:
-# Persistent shared storage for pods.
+The infrastructure provides the fundamental capabilities required to operate Kubernetes workloads reliably on AWS, including networking, identity, storage, logging, and HTTPS.
 
+## Infrastructure Modules
 
-# ------------------------------------------------------------
-# 4.6 ARTIFACT LAYER (ECR)
-# ------------------------------------------------------------
-# ECR stores container images:
-#
-# - user service
-# - admin service
-# - monitoring service
-#
-# Features:
-# - image scanning on push
-# - lifecycle policy (keep last 10 images)
-#
-# Purpose:
-# Central container image registry.
+The major infrastructure responsibilities are separated into modules:
 
+```text
+modules/
+├── acm/          # TLS certificates
+├── efs/          # Shared persistent storage
+├── eks/          # Kubernetes platform
+├── iam-core/     # Core AWS identities
+├── iam-irsa/     # Kubernetes workload identities
+├── logging/      # Centralized CloudWatch logging
+├── network/      # VPC and networking
+├── security/     # AWS security groups
+└── sg-prep/      # Security group definitions
+```
 
-# ------------------------------------------------------------
-# 4.7 OBSERVABILITY LAYER
-# ------------------------------------------------------------
-# CloudWatch logging is centralized.
-#
-# Log groups:
-# - application logs
-# - audit logs
-# - EKS cluster logs
-# - VPC flow logs
-#
-# Purpose:
-# Provides full visibility into system behavior.
+Each module contains its own README explaining its specific responsibility and its role within KUBAPP.
 
+## Root Terraform Files
 
-# ------------------------------------------------------------
-# 4.8 EDGE LAYER (ACM + DNS)
-# ------------------------------------------------------------
-# ACM handles TLS certificates.
-# Route53 handles DNS validation.
-#
-# Supports:
-# - root domain
-# - wildcard certificates
-#
-# Purpose:
-# Secure HTTPS and domain routing.
+The root Terraform files provide the **control layer** for the infrastructure.
 
+| File           | Responsibility                                                                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `main.tf`      | Composes the infrastructure modules and connects their inputs and outputs                                        |
+| `variables.tf` | Defines the inputs required by the infrastructure                                                                |
+| `local.tf`     | Defines reusable and derived values such as naming, tagging, logging configuration, and environment-aware values |
+| `providers.tf` | Configures the Terraform providers used to manage AWS and other infrastructure APIs                              |
+| `versions.tf`  | Defines Terraform and provider version requirements for reproducible deployments                                 |
+| `backend.tf`   | Configures remote Terraform state and state locking using S3                                                     |
+| `outputs.tf`   | Exposes important infrastructure values for other layers and automation                                          |
 
-# ------------------------------------------------------------
-# SECURITY MODEL
-# ------------------------------------------------------------
-# Security is built on:
-#
-# - private subnets for workloads
-# - IRSA for AWS permissions
-# - security groups for traffic control
-# - encrypted state and storage
-#
-# No hardcoded credentials are used.
+## Environments
 
+The `envs/` directory contains environment-specific configuration.
 
-# ------------------------------------------------------------
-# HOW EVERYTHING CONNECTS (FLOW)
-# ------------------------------------------------------------
-# Network creates VPC + subnets
-#        ↓
-# Security defines traffic rules
-#        ↓
-# IAM creates roles
-#        ↓
-# EKS cluster is created
-#        ↓
-# IRSA connects Kubernetes → AWS permissions
-#        ↓
-# EFS + ECR provide storage and images
-#        ↓
-# Logging + ACM complete observability + security
+This allows the same infrastructure design to be used for environments such as:
 
+```text
+envs/
+├── dev/
+└── prod/
+```
 
-# ------------------------------------------------------------
-# SUMMARY
-# ------------------------------------------------------------
-# the infrastructure is built for:
-#
-# - Kubernetes workloads
-# - secure identity management
-# - scalable networking
-# - production-grade observability
-# - GitOps integration readiness
-#
+Environment configuration supplies values such as:
+
+* Environment name
+* Cluster configuration
+* Domain configuration
+* Infrastructure sizing
+* Logging settings
+
+The infrastructure code remains shared while environment-specific values are kept separate.
+
+## Role in KUBAPP
+
+The `infra/` layer is the **cloud foundation of KUBAPP**.
+
+It does not deploy application workloads itself. Instead, it provides the AWS and Kubernetes infrastructure required by the higher layers of the platform.
+

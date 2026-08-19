@@ -59,12 +59,14 @@ add_finding() {
     local type="$2"
     local file="$3"
     local message="$4"
+    local relative
+    relative="$(relative_path "${file}")"
 
     FINDINGS+=(
         "$(jq -n \
             --arg severity "${severity}" \
             --arg type "${type}" \
-            --arg file "${file}" \
+            --arg file "${relative}" \
             --arg message "${message}" \
             '{
                 severity: $severity,
@@ -228,7 +230,7 @@ while IFS= read -r file; do
         continue
     fi
     if has_private_key "${file}"; then
-        relative="${file#"${PROJECT_ROOT}/"}"
+        relative="$(relative_path "${file}")"
 
         add_finding \
             "critical" \

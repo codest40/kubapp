@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================
-# KUBAPP — DRIFT ENGINE v3 (SCHEMA LOCKED TO DISCOVERY)
+# KUBAPP — DRIFT ENGINE
 # SOURCE OF TRUTH: inventory.json ONLY
 # NO FILESYSTEM DISCOVERY ALLOWED
 # ============================================================
@@ -15,7 +15,7 @@ MODULE_NAME="drift"
 DRIFT_FILE="$(evidence_file "drift")"
 OUTPUT_FILE="${DRIFT_FILE}"
 
-log_info "drift v3 (schema-locked) starting"
+log_info "drift (schema-locked) starting"
 
 require_binary "jq"
 

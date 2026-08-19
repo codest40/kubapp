@@ -105,6 +105,16 @@ resolve_path() {
     fi
 }
 
+relative_path() {
+    local p="$1"
+
+    if [[ "$p" == "${PROJECT_ROOT}/"* ]]; then
+        echo "${p#"${PROJECT_ROOT}/"}"
+    else
+        echo "$p"
+    fi
+}
+
 require_binary() {
     local binary="$1"
 

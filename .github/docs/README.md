@@ -1,517 +1,155 @@
-# KubApp — GitOps Workflows Layer (ArgoCD + CI/CD Control Plane)
-
-# ------------------------------------------------------------
-# OVERVIEW — WHAT THIS SYSTEM IS
-# ------------------------------------------------------------
-# The KubApp workflows layer is a GitOps control plane built on
-# top of Kubernetes + Terraform where Git acts as the single
-# source of truth for:
-
-# - Infrastructure state (Terraform)
-# - Application registry (JSON manifests)
-# - Deployment state (Helm values + ingress definitions)
-# - Runtime versioning (Docker images)
-# - Cluster health validation (verification + drift detection)
-
-# Every change flows through controlled GitHub Actions pipelines
-# that validate, transform, and reconcile system state.
-
-
-# ------------------------------------------------------------
-# CORE PHILOSOPHY
-# ------------------------------------------------------------
-
-# 1. Git is the source of truth
-# Every change ends in Git (infra, apps, runtime, state)
-
-# 2. State is explicitly tracked
-# gitops/state/current.json
-# controls:
-# - active environment
-# - workflow correlation
-# - validation context
-
-# 3. Every mutation is reversible
-# - snapshots (verify_runtime.yml)
-# - tags (stable-*)
-# - rollback workflows (rollback.yml)
-
-# 4. Drift is expected, not ignored
-# The system actively detects and reconciles:
-# - Terraform drift (tf_drift.yml)
-# - Ingress drift (validate_ingress.yml)
-# - Runtime drift (verify_runtime.yml)
-
-# 5. Safety gates are mandatory
-# - manual approvals (production workflows)
-# - strict vs repair modes
-# - environment-based controls
-
-
-# ------------------------------------------------------------
-# WORKFLOW ARCHITECTURE
-# ------------------------------------------------------------
-
-# The system is organized into layered workflows:
-
-# Layer 1 → Infrastructure (Terraform Core)
-# Layer 2 → Cluster Bootstrap (ArgoCD setup)
-# Layer 3 → Application Build Engine
-# Layer 4 → GitOps Registry Engine
-# Layer 5 → Application Provisioning Engine
-# Layer 6 → Application Removal Engine
-# Layer 7 → Ingress Reconciliation Engine
-# Layer 8 → Runtime Verification Engine
-# Layer 9 → Drift Detection Engine
-# Layer 10 → State & Safety Control Layer
-
-
-# ------------------------------------------------------------
-# LAYER 1 — INFRASTRUCTURE (terraform.yml)
-# ------------------------------------------------------------
-# This is the infrastructure brain of the system.
-
-# Responsibilities:
-# - VPC, IAM, EKS provisioning
-# - Kubernetes cluster bootstrap
-# - OIDC AWS authentication
-# - encrypted tfvars via SOPS
-# - separation of infra and K8s stacks
-
-# Flow:
-# Plan → Approval (prod) → Apply → Bootstrap → Cleanup hooks
-
-# Includes destroy pipeline:
-# - extracts cluster metadata
-# - cleans Kubernetes first
-# - destroys EKS + infra
-# - cleans logs and leftovers
-
-
-# ------------------------------------------------------------
-# LAYER 2 — CLUSTER BOOTSTRAP (setup_argocd.yml)
-# ------------------------------------------------------------
-# Converts raw EKS into GitOps-ready platform.
-
-# Responsibilities:
-# - configure kubeconfig
-# - install SOPS + AGE keys
-# - install ArgoCD GitHub App secret
-# - install metrics-server
-# - run bootstrap scripts
-
-# Result:
-# - ArgoCD connected to GitHub
-# - cluster ready for reconciliation
-# - ingress + DNS synchronization active
-
-
-# ------------------------------------------------------------
-# LAYER 3 — APPLICATION BUILD ENGINE (build.yml)
-# ------------------------------------------------------------
-# Core application factory pipeline.
-
-# Responsibilities:
-# - scan docker/ directories
-# - build Docker images (cached or fresh)
-# - push to registry
-# - generate JSON manifests per service
-
-# Runtime metadata stored:
-# - image
-# - tag
-# - port
-# - health endpoints
-# - volumes
-# - runtime flags
-
-# Outputs:
-# - registry artifacts
-# - GitOps registry update commit
-
-
-# ------------------------------------------------------------
-# LAYER 4 — GITOPS REGISTRY ENGINE (update.yml)
-# ------------------------------------------------------------
-# Runtime update mechanism.
-
-# Responsibilities:
-# - reads gitops/state/current.json
-# - resolves active services
-# - updates Helm values:
-#   - image
-#   - tag
-# - commits changes
+# KubApp CI/CD
 
-# Purpose:
-# Enables deployment updates without rebuilding images
-
+KubApp uses GitHub Actions to automate the application lifecycle from
+source changes through container image creation, GitOps registry
+generation, Kubernetes provisioning, deployment, verification,
+rollback, and cleanup.
 
-# ------------------------------------------------------------
-# LAYER 5 — APPLICATION PROVISIONING (add_new_app.yml)
-# ------------------------------------------------------------
-# Auto-onboarding system for new services.
-
-# Responsibilities:
-# - validate state file
-# - read registry JSON artifacts
-# - generate Helm values
-# - inject secrets
-# - register ingress routes
-# - commit GitOps changes
-
-# Result:
-# New application automatically enters Kubernetes
+## CI/CD Architecture
 
+The architecture and end-to-end workflow are documented in:
 
-# ------------------------------------------------------------
-# LAYER 6 — APPLICATION REMOVAL (remove_app.yml)
-# ------------------------------------------------------------
-# Controlled deletion pipeline.
-
-# Responsibilities:
-# - executes cleanup scripts
-# - removes Helm entries
-# - updates GitOps state
-# - commits removal
-
-# Purpose:
-# Ensures safe deletion (no manual kubectl usage)
-
-
-# ------------------------------------------------------------
-# LAYER 7 — INGRESS RECONCILIATION (validate_ingress.yml)
-# ------------------------------------------------------------
-# Self-healing ingress validation system.
-
-# Responsibilities:
-# - compare registry vs ingress state
-# - detect drift:
-#   - missing services
-#   - invalid routes
-
-# Modes:
-# - strict → fail pipeline
-# - repair → auto-fix
-# - auto_register → inject missing services
-
-# Purpose:
-# Ensures routing always matches desired state
-
+- [CI/CD Architecture](./docs/architecture.md)
+- [Execution Flow](./docs/flow.md)
 
-# ------------------------------------------------------------
-# LAYER 8 — RUNTIME VERIFICATION (verify_runtime.yml)
-# ------------------------------------------------------------
-# Post-deployment validation engine.
-
-# Responsibilities:
-# - connect to EKS
-# - validate cluster state
-# - verify ArgoCD sync
-# - generate deployment snapshot
-# - tag stable commit
-
-# Behavior:
-# - can trigger rollback suggestion on failure
-
+## Pipeline Stages
 
-# ------------------------------------------------------------
-# LAYER 9 — DRIFT DETECTION (tf_drift.yml)
-# ------------------------------------------------------------
-# Terraform state observability layer.
-
-# Responsibilities:
-# - terraform plan -detailed-exitcode
-# - detect:
-#   - no drift
-#   - drift detected
-#   - errors
-# - aggregate per module
-
-# Purpose:
-# Infrastructure divergence visibility
+1. **Build**
+2. **Registry Generation**
+3. **GitOps Provisioning**
+4. **Deployment**
+5. **Runtime Verification**
+6. **Rollback**
+7. **Cleanup**
 
-
-# ------------------------------------------------------------
-# LAYER 10 — STATE & SAFETY CONTROL
-# ------------------------------------------------------------
-
-# unlock.yml
-# - forces terraform state unlock
-
-# rollback.yml
-# - GitOps rollback (target or full reset)
-
-# stable_deploy.yml
-# - resolves latest stable tag
-# - restores snapshot state
-
-# ------------------------------------------------------------
-# LAYER 10 — STATE & SAFETY CONTROL
-# ------------------------------------------------------------
+## Workflow Categories
 
-# unlock.yml
-# - forces terraform state unlock
-
-# rollback.yml
-# - GitOps rollback (target or full reset)
-
-# stable_deploy.yml
-# - resolves latest stable tag
-# - restores snapshot state
-
-# High-level orchestrator workflow for triggering multiple
-# pipeline layers from a single entry point.
-
-# Responsibilities:
-# - Accepts environment (dev/prod)
-# - Accepts mode (full/build/deploy/cleanup)
-# - Triggers downstream workflows via GitHub CLI:
-#   - build.yml
-#   - setup_argocd.yml
-#   - verify_runtime.yml
-#   - clean_argocd.yml
-
-# Purpose:
-# Provides a single “control switch” for full lifecycle
-# execution of the platform.
-
-# ------------------------------------------------------------
-# LAYER 11 — APP ARTIFACTS INSPECTOR (app_artifacts.yml)
-# ------------------------------------------------------------
-
-# Debugging and observability workflow for build outputs.
-
-# Responsibilities:
-# - Finds latest successful build.yml run
-# - Lists all generated artifacts
-# - Downloads specific service artifact (registry-*)
-# - Dumps full file structure and contents
-
-# Purpose:
-# Enables inspection of generated registry JSON files and
-# build-time metadata for debugging GitOps state.
-
-# ------------------------------------------------------------
-# LAYER 12 — DOCKER PUSH TEST WORKFLOW (docker-push.yml)
-# ------------------------------------------------------------
-
-# Lightweight validation workflow for individual Docker builds.
-
-# Responsibilities:
-# - Validates folder exists under docker/
-# - Builds image using Docker Buildx
-# - Pushes to Docker Hub
-# - Tags with latest and commit SHA
-
-# Purpose:
-# Quick manual testing of single service image builds
-# without running full build pipeline.
-
-# ------------------------------------------------------------
-# LAYER 13 — FIXER WORKFLOW (fixer.yml).. For Experimental Reasons, not a major parht of project
-# ------------------------------------------------------------
-
-# Emergency operational command runner for cluster + Terraform. 
+| Category | Workflows |
+|---|---|
+| Pipeline orchestration | [`activate_pipeline.yml`](./activate_pipeline.yml) |
+| Application build | [`build.yml`](./build.yml) |
+| GitOps provisioning | [`add_new_app.yml`](./add_new_app.yml) |
+| Deployment | [`setup_argocd.yml`](./setup_argocd.yml), [`verify_runtime.yml`](./verify_runtime.yml) |
+| Rollback | [`get_stable_deploy.yml`](./get_stable_deploy.yml), [`rollback.yml`](./rollback.yml) |
+| Cleanup | [`clean_argocd.yml`](./clean_argocd.yml), [`remove_app.yml`](./remove_app.yml) |
+| Ingress management | [`remove_svc.yml`](./remove_svc.yml) |
+| Operations | [`fixer.yml`](./fixer.yml) |
+| Debugging / artifacts | [`app_artifacts.yml`](./app_artifacts.yml), [`docker-push.yml`](./docker-push.yml) |
+
+## Documentation
+
+Detailed documentation for each part of the CI/CD system is maintained
+under [`docs/`](./docs/).
+
+### Architecture & Flow
+
+- [CI/CD Architecture](./docs/architecture.md) — Overall CI/CD architecture, workflow relationships, and major components.
+- [Execution Flow](./docs/flow.md) — End-to-end flow from source change through build, GitOps provisioning, deployment, verification, and cleanup.
+
+### Build & Registry
+
+- [Build Pipeline](./docs/build.md) — Container build, tagging, pushing, service matrix generation, and registry artifact creation.
+- [Registry Generation](./docs/registry.md) — How build artifacts are transformed into the GitOps registry and how platform/backend services are registered.
+
+### GitOps & Application Provisioning
+
+- [GitOps Provisioning](./../gitops/README.md) — Application metadata, values generation, secret injection, ingress registration, validation, and GitOps commits.
+- [Application Provisioning](./docs/add_new_app.md) — Detailed behavior of the application provisioning workflow.
+- [Ingress Management](./docs/ingress.md) — Shared ingress registration and service removal.
+
+### Deployment & Verification
+
+- [Deployment](./docs/deployment.md) — Argo CD setup, application deployment, and environment-specific deployment behavior.
+- [Runtime Verification](./docs/verification.md) — Post-deployment health checks and runtime validation.
+
+### Rollback
+
+- [Rollback](./docs/rollback.md) — Stable deployment identification, deployment snapshots, target rollback, and full rollback.
+- [Stable Deployment](./docs/stable_deploy.md) — How KubApp identifies and retrieves the last known stable deployment.
+
+### Cleanup & Reconciliation
+
+- [Cleanup](./docs/cleanup.md) — Cluster cleanup and removal of Kubernetes resources.
+- [Application Reconciliation](./docs/reconciliation.md) — Detection and removal of orphaned application resources.
+- [Service Removal](./docs/remove_service.md) — Removing services from the shared ingress and triggering downstream reconciliation.
+
+### Operations & Debugging
+
+- [Operational Workflows](./docs/operations.md) — Manual operational actions and the KubApp fixer workflow.
+- [Artifact Inspection](./docs/artifacts.md) — Inspecting build artifacts and deployment snapshots.
+
+## Workflow Reference
+
+For the complete list of GitHub Actions workflows, see the
+[`.github/workflows`](./workflows/) directory.
+
+| Workflow | Purpose |
+|---|---|
+| [`activate_pipeline.yml`](./workflows/activate_pipeline.yml) | Manually orchestrates the major pipeline stages |
+| [`build.yml`](./workflows/build.yml) | Builds and pushes application images and generates registry metadata |
+| [`add_new_app.yml`](./workflows/add_new_app.yml) | Provisions applications into the GitOps structure |
+| [`setup_argocd.yml`](./workflows/setup_argocd.yml) | Configures Argo CD and deployment resources |
+| [`verify_runtime.yml`](./workflows/verify_runtime.yml) | Verifies deployed application runtime state |
+| [`get_stable_deploy.yml`](./workflows/get_stable_deploy.yml) | Retrieves the stable deployment information used for rollback |
+| [`rollback.yml`](./workflows/rollback.yml) | Performs target or full rollback |
+| [`clean_argocd.yml`](./workflows/clean_argocd.yml) | Cleans Kubernetes / Argo CD resources |
+| [`remove_app.yml`](./workflows/remove_app.yml) | Reconciles and removes orphaned applications |
+| [`remove_svc.yml`](./workflows/remove_svc.yml) | Removes services from shared ingress |
+| [`fixer.yml`](./workflows/fixer.yml) | Provides controlled operational troubleshooting |
+| [`app_artifacts.yml`](./workflows/app_artifacts.yml) | Inspects build artifacts |
+| [`docker-push.yml`](./workflows/docker-push.yml) | Manually builds and pushes a Docker image |
+
+## Design Principles
+
+KubApp CI/CD is designed around:
+
+- **Git-driven automation** — GitHub is the source of workflow and GitOps changes.
+- **Immutable container images** — Builds produce uniquely tagged images while maintaining a `latest` tag.
+- **GitOps-based deployment** — Kubernetes deployment state is generated and managed through Git.
+- **Environment isolation** — Development and production workflows explicitly identify their target environment.
+- **Automated reconciliation** — Orphaned applications and stale resources can be detected and removed.
+- **Controlled rollback** — Stable deployments are identified and can be restored without rebuilding application images.
+- **Operational safety** — Destructive operations include explicit safety checks and production protections.
+- **Centralized ingress** — Applications are registered into the shared ingress configuration rather than creating independent ingress infrastructure for every application.
+- **Secret management with SOPS** — Secrets are handled through SOPS/AGE encryption; plaintext values that may appear in local development files are local-only and are not committed or used outside the local environment.
+
+## Directory Structure
+
+```text
+.github/
+├── README.md
+└── workflows/
+    ├── activate_pipeline.yml
+    ├── add_new_app.yml
+    ├── app_artifacts.yml
+    ├── build.yml
+    ├── clean_argocd.yml
+    ├── docker-push.yml
+    ├── fixer.yml
+    ├── get_stable_deploy.yml
+    ├── remove_app.yml
+    ├── remove_svc.yml
+    ├── rollback.yml
+    ├── setup_argocd.yml
+    └── verify_runtime.yml
+
+    docs/
+    ├── README.md
+    ├── architecture.md
+    ├── flow.md
+    ├── build.md
+    ├── registry.md
+    ├── gitops.md
+    ├── add_new_app.md
+    ├── ingress.md
+    ├── deployment.md
+    ├── verification.md
+    ├── rollback.md
+    ├── stable_deploy.md
+    ├── cleanup.md
+    ├── reconciliation.md
+    ├── remove_service.md
+    ├── operations.md
+    ├── artifacts.md
+    └── 
 
-# Responsibilities:
-# - Accepts arbitrary multi-line commands
-# - Executes kubectl / terraform commands safely
-# - Initializes Terraform backend
-# - Prints final cluster state
-
-# Purpose:
-# On-demand debugging and incident response tool for engineers.
-
-# Extremely powerful — effectively a remote execution console
-# for platform recovery and diagnostics.
-
-# ------------------------------------------------------------
-# LAYER 14 — STABLE DEPLOY RESOLVER (get_stable_deploy.yml)
-# ------------------------------------------------------------
-
-# Rollback intelligence workflow for stable system recovery.
-
-# Responsibilities:
-# - Finds latest stable-* Git tag per environment
-# - Resolves commit hash
-# - Retrieves verify_runtime.yml execution run
-# - Downloads deployment snapshot artifact
-# - Displays cluster state at that commit
-
-# Purpose:
-# Enables deterministic rollback to last known good state
-# using snapshot-based recovery.
-
-# ------------------------------------------------------------
-# LAYER 15 — ORPHAN APPLICATION CLEANER (remove_app.yml)
-# ------------------------------------------------------------
-
-# Automated reconciliation engine for GitOps cleanup.
-
-# Responsibilities:
-# - Compares GitOps registry vs ingress state
-# - Detects orphan applications
-# - Removes unused app directories
-# - Prevents deletion in production unless safe
-# - Commits cleanup changes
-
-# Modes:
-# - auto → full reconciliation
-# - manual → targeted removal
-
-# Purpose:
-# Ensures GitOps state remains consistent with ingress reality.
-
-# ------------------------------------------------------------
-# LAYER 16 — SERVICE INGRESS REMOVER (remove_svc.yml)
-# ------------------------------------------------------------
-
-# Targeted ingress mutation workflow.
-
-# Responsibilities:
-# - Accepts list of services
-# - Removes them from ingress YAML
-# - Calls register_new_svc.sh in remove mode
-# - Validates YAML integrity
-# - Commits updated ingress state
-
-# Purpose:
-# Fine-grained control of routing layer without touching apps.
-
-# ------------------------------------------------------------
-# LAYER 17 — ARGOCLOUD CLEANUP (clean_argocd.yml)
-# ------------------------------------------------------------
-
-# Full cluster teardown workflow.
-
-# Responsibilities:
-# - Requires explicit "YES" confirmation
-# - Configures AWS + EKS access
-# - Executes cluster cleanup scripts
-# - Removes ArgoCD + Kubernetes resources
-# - Verifies cluster state after deletion
-
-# Purpose:
-# Hard reset of GitOps-controlled cluster environment.
-
-# SAFETY:
-# Strong confirmation gate prevents accidental execution.
-
-# ------------------------------------------------------------
-# LAYER 18 — ROLLBACK ENGINE (rollback.yml)
-# ------------------------------------------------------------
-
-# GitOps rollback controller.
-
-# Responsibilities:
-# - Restores previous GitOps state
-# - Re-applies Helm values from stable snapshot
-# - Reverts registry and ingress changes
-# - Works with stable_deploy workflow
-
-# Purpose:
-# Deterministic recovery from failed deployments.
-
-# ------------------------------------------------------------
-# LAYER 19 — PIPELINE VALIDATION (test_tf.yml)
-# ------------------------------------------------------------
-
-# Terraform validation and CI safety gate.
-
-# Responsibilities:
-# - Runs terraform validate/plan checks
-# - Ensures IaC correctness before apply
-# - Prevents broken infrastructure commits
-
-# Purpose:
-# Pre-merge infrastructure correctness enforcement.
-
-# ------------------------------------------------------------
-# LAYER 20 — PIPELINE CLEANER (unlock.yml)
-# ------------------------------------------------------------
-
-# Terraform state recovery utility.
-
-# Responsibilities:
-# - Unlocks stuck terraform state locks
-# - Prevents deadlock in CI pipelines
-
-# Purpose:
-# Operational recovery tool for infra pipeline issues.
-
-# ------------------------------------------------------------
-# DATA FLOW MODEL
-# ------------------------------------------------------------
-
-# Docker Build
-#   ↓
-# registry JSON artifact
-#   ↓
-# GitOps registry commit
-#   ↓
-# add_new_app.yml
-#   ↓
-# Helm value generation
-#   ↓
-# ingress registration
-#   ↓
-# ArgoCD sync
-#   ↓
-# verify_runtime.yml
-#   ↓
-# stable tag creation
-
-
-# Parallel Systems:
-# - tf_drift.yml → infrastructure health
-# - validate_ingress.yml → routing correctness
-# - update.yml → runtime image updates
-
-
-# ------------------------------------------------------------
-# KEY DESIGN DECISIONS
-# ------------------------------------------------------------
-
-# 1. State file as coordination layer
-# gitops/state/current.json controls workflow context
-
-# 2. GitHub App authentication everywhere
-# avoids PAT leakage and improves security isolation
-
-# 3. Artifact-based pipeline handoff
-# build once → reuse across GitOps
-
-# 4. Strict concurrency control
-# prevents:
-# - duplicate deployments
-# - race conditions
-# - conflicting ingress updates
-
-# 5. Dual-mode execution
-# - strict mode → fail fast
-# - repair mode → auto-heal
-
-
-# ------------------------------------------------------------
-# SYSTEM SUMMARY
-# ------------------------------------------------------------
-
-# The KubApp workflows layer functions as a lightweight
-# internal PaaS control plane built entirely on GitOps.
-
-# It manages:
-# - infrastructure provisioning
-# - application lifecycle
-# - image lifecycle
-# - runtime reconciliation
-# - drift detection
-# - rollback + snapshot system
-# - ingress self-healing
-# - state coordination
-
-# In essence:
-#
-# A fully Git-driven orchestration system that behaves like
-# an internal platform engineering control plane.
-# ============================================================

@@ -1,19 +1,9 @@
 # KubApp — Infrastructure as Code (IaC Layer — Terraform)
 
 ## OVERVIEW
-### This directory defines the complete AWS + Kubernetes
-### infrastructure foundation for Kubapp using Terraform modules,
-### multi-environment state management, and layered separation of concerns.
+#### This directory defines the complete AWS + Kubernetes infrastructure foundation for Kubapp using Terraform modules, multi-environment state management, and layered separation of concerns.
 
 ## The system is structured into four major domains:
-
-## infra/       → Core AWS + EKS infrastructure
-## k8s/         → Kubernetes platform bootstrap layer
-## manifests/   → Kubernetes-native resource orchestration
-## boot/        → Terraform backend initialization
-
-
-## DIRECTORY OVERVIEW
 ```
  iac/
  ├── infra/        # AWS + EKS infrastructure modules

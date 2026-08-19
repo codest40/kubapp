@@ -45,7 +45,7 @@ patch_finalizers_objects() {
 }
 
 ########################################
-# SAFE FORCE DELETE (NO HANG VERSION)
+# SAFE FORCE DELETE
 ########################################
 nuke_as_last_option() {
   local ns="$1"
@@ -114,7 +114,7 @@ safe_delete_loop() {
 }
 
 ########################################
-# ARGOCD HARD STOP (CRITICAL FIX)
+# ARGOCD HARD STOp
 ########################################
 
 echo ">> STOPPING ArgoCD RECONCILIATION FIRST"
@@ -149,7 +149,7 @@ for ns in $ALL_NS; do
   echo "=============================="
 
   ########################################
-  # RESOURCE ORDER (IMPORTANT)
+  # RESOURCE ORDER
   ########################################
 
   safe_delete_loop "$ns" "applications.argoproj.io" 30
@@ -170,7 +170,7 @@ for ns in $ALL_NS; do
   done
 
   ########################################
-  # NAMESPACE DELETE (FINAL SAFE ESCALATION)
+  # NAMESPACE DELETE
   ########################################
 
   echo ">> Deleting namespace: $ns"

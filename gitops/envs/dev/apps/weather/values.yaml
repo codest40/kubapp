@@ -3,7 +3,7 @@ namespace: dev
 serviceAccount:
   create: true
   name: weather-sa
-  roleArn: arn:aws:iam::198200019771:role/kubapp-dev-app-pods-role
+  roleArn: arn:aws:iam::532918215760:role/kubapp-dev-app-pods-role
 serviceMonitor:
   enabled: true
   path: /metrics
@@ -11,7 +11,7 @@ serviceMonitor:
 replicaCount: 2
 image:
   repository: paragon40/weather_app
-  tag: 0acdef5f43654075a87509cae340a1c54dd628bb-1779781278
+  tag: bbf7883ba408305cf8ce5e7b5aaa994961fadfa9-1780923207
   pullPolicy: Always
 service:
   type: ClusterIP
@@ -59,7 +59,7 @@ hpa:
   memory: 70
 meta:
   staticFingerprint: 1f3b831b2cf66454cfd85ffc89c9a88645d5eae258e7587330db355c10509795
-  generatedAt: 2026-05-27T11:22:13Z
+  generatedAt: 2026-06-11T11:44:23Z
   source: build-pipeline
 storage:
   volumes:

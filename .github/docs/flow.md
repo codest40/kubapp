@@ -1,4 +1,5 @@
-```bash
+# Execution Flow
+```
                 ┌──────────────────────────────┐
                 │  GitHub Actions Workflows    │
                 │  (CI/CD Control Plane)       │
@@ -22,5 +23,3 @@ Kubernetes Cluster (AWS EKS)
      │
      ▼
 ArgoCD (Declarative Sync Engine)
-
-```

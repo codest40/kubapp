@@ -3,7 +3,7 @@ namespace: dev
 serviceAccount:
   create: true
   name: metrics-sa
-  roleArn: arn:aws:iam::198200019771:role/kubapp-dev-app-pods-role
+  roleArn: arn:aws:iam::532918215760:role/kubapp-dev-app-pods-role
 serviceMonitor:
   enabled: true
   path: /metrics
@@ -11,7 +11,7 @@ serviceMonitor:
 replicaCount: 2
 image:
   repository: paragon40/metrics_app
-  tag: 0acdef5f43654075a87509cae340a1c54dd628bb-1779781291
+  tag: bbf7883ba408305cf8ce5e7b5aaa994961fadfa9-1780923208
   pullPolicy: Always
 service:
   type: ClusterIP
@@ -59,7 +59,7 @@ hpa:
   memory: 70
 meta:
   staticFingerprint: 6eb65282886a0603f8c86255c84251d376fa95d72df49a6392d9bc346965da9f
-  generatedAt: 2026-05-27T11:22:16Z
+  generatedAt: 2026-06-11T11:44:22Z
   source: build-pipeline
 storage:
   volumes:

@@ -58,30 +58,15 @@ fi
 echo "[INFO] Using AGE key: $AGE_PUBLIC_KEY"
 echo
 
-# =========================
-# ENV SELECTION
-# =========================
 get_envs() {
   case "$ENV" in
-    dev)
-      echo "dev"
-      ;;
-    prod)
-      echo "prod"
-      ;;
-    all)
-      echo "dev prod"
-      ;;
-    *)
-      echo "[ERROR] ❌ Invalid env: $ENV"
-      exit 1
-      ;;
+    dev) echo "dev" ;;
+    prod) echo "prod" ;;
+    all) echo "dev prod" ;;
+    *) echo "[ERROR] ❌ Invalid env: $ENV"; exit 1 ;;
   esac
 }
 
-# =========================
-# ENCRYPT FUNCTION
-# =========================
 encrypt_tfvars() {
   local file="$1"
   local out="${file}.enc"
@@ -93,14 +78,9 @@ encrypt_tfvars() {
     "$file" > "$out"
 }
 
-# =========================
-# MAIN LOOP
-# =========================
 echo "--------------------------------------------------"
 echo "[INFO] TERRAFORM SECRETS ENCRYPTION"
 echo "--------------------------------------------------"
-echo "[INFO] Starting encryption for ENV=$ENV"
-echo
 
 for env in $(get_envs); do
   echo "[INFO] ENV: $env"
@@ -126,19 +106,62 @@ for env in $(get_envs); do
   echo
 done
 
-# =========================
-# GITOPS SOPS ENCRYPTION
-# =========================
+# SHARED HELPERS
+is_encrypted() {
+  grep -q '^sops:' "$1"
+}
+
+backup_file() {
+  local file="$1"
+  local backup="${file}.bak"
+
+  cp -f "$file" "$backup"
+  echo "[INFO] Backup created: $backup"
+  echo "$backup"
+}
+
+decrypt_file() {
+  local file="$1"
+  echo "[INFO] Decrypting: $file"
+  sops -d -i "$file"
+}
+
+process_secret_file() {
+  local file="$1"
+  local backup="${file}.bak"
+
+  echo "[INFO] Processing: $file"
+
+  # CASE 1: NOT ENCRYPTED
+  if ! is_encrypted "$file"; then
+    echo "[INFO] Plain file detected"
+    backup_file "$file"
+    sops -e -i "$file"
+    echo "[INFO] Encrypted: $file"
+    return
+  fi
+
+  # CASE 2: ENCRYPTED BUT NO BACKUP
+  if is_encrypted "$file" && [[ ! -f "$backup" ]]; then
+    echo "[WARN] Encrypted but missing backup"
+    decrypt_file "$file"
+    backup_file "$file"
+    sops -e -i "$file"
+    echo "[INFO] Re-encrypted after recovery: $file"
+    return
+  fi
+
+  # CASE 3: SAFE STATE
+  echo "[INFO] Already safe (encrypted + backup exists)"
+}
+
 echo "--------------------------------------------------"
 echo "[INFO] GITOPS SECRETS ENCRYPTION"
 echo "--------------------------------------------------"
 
 GITOPS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../gitops/secrets" && pwd)"
-BACKUP_DIR="$GITOPS_DIR/.backup"
 
 echo "[INFO] Target directory: $GITOPS_DIR"
-
-mkdir -p "$BACKUP_DIR"
 
 [[ -d "$GITOPS_DIR" ]] || {
   echo "[ERROR] ❌ Directory not found: $GITOPS_DIR"
@@ -147,72 +170,17 @@ mkdir -p "$BACKUP_DIR"
 
 shopt -s nullglob
 
-found_files=false
-valid_files=false
-
 for file in "$GITOPS_DIR"/*.yaml "$GITOPS_DIR"/*.yml; do
   [[ -f "$file" ]] || continue
-  found_files=true
-
-  echo "[INFO] Processing: $file"
-
-  # -------------------------
-  # Detect already encrypted
-  # -------------------------
-  if grep -q '^sops:' "$file"; then
-    echo "[WARN] ⚠️ Already encrypted, skipping: $file"
-    valid_files=true
-    continue
-  fi
-
-  # -------------------------
-  # Backup original
-  # -------------------------
-  backup_file="$BACKUP_DIR/$(basename "$file").bak"
-  cp -f "$file" "$backup_file"
-  echo "[INFO] Backup created: $backup_file"
-
-  # -------------------------
-  # Encrypt in-place
-  # -------------------------
-  if sops -e -i "$file"; then
-    echo "[INFO] ✅ Encrypted: $file"
-    valid_files=true
-  else
-    echo "[ERROR] ❌ Failed: $file"
-    echo "[ERROR] Restoring backup..."
-    cp -f "$backup_file" "$file"
-    exit 1
-  fi
-
+  process_secret_file "$file"
 done
 
-# -------------------------
-# Final validation
-# -------------------------
-echo
-echo "--------------------------------------------------"
-echo "[INFO] FINAL VALIDATION"
-echo "--------------------------------------------------"
-
-if [[ "$found_files" = false ]]; then
-  echo "[ERROR] ❌ No YAML files found"
-  exit 1
-fi
-
-if [[ "$valid_files" = false ]]; then
-  echo "[ERROR] ❌ No valid encrypted files exist"
-  exit 1
-fi
-
-# =========================
-# DOCKER APP SECRETS ENCRYPTION
-# =========================
 echo "--------------------------------------------------"
 echo "[INFO] DOCKER SECRETS ENCRYPTION"
 echo "--------------------------------------------------"
 
 DOCKER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../docker" && pwd)"
+
 echo "[INFO] Target directory: $DOCKER_DIR"
 
 [[ -d "$DOCKER_DIR" ]] || {
@@ -220,42 +188,9 @@ echo "[INFO] Target directory: $DOCKER_DIR"
   exit 1
 }
 
-shopt -s nullglob
-
-found_docker_files=false
-valid_docker_files=false
-
 while IFS= read -r -d '' file; do
   [[ -f "$file" ]] || continue
-  found_docker_files=true
-
-  echo "[INFO] Processing: $file"
-
-  # Backup
-  backup_1="${file}.bak"
-
-  cp -f "$file" "$backup_1"
-  echo "[INFO] Backup updated: $backup_1"
-
-  echo "[INFO] Backup created: $backup_1"
-
-  # Skip already encrypted
-  if grep -q '^sops:' "$file"; then
-    echo "[WARN] ⚠️ Already encrypted: $file"
-    valid_docker_files=true
-    continue
-  fi
-
-  if sops -e -i "$file"; then
-    echo "[INPLACE] Encrypted: $file"
-    valid_docker_files=true
-  else
-    echo "[ERROR] ❌ Failed: $file"
-    echo "[ERROR] Restoring backup..."
-    cp -f "$backup_file" "$file"
-    exit 1
-  fi
-
+  process_secret_file "$file"
 done < <(
   find "$DOCKER_DIR" -type f \( \
     -name "secrets.yml" -o \
@@ -265,12 +200,7 @@ done < <(
   \) -print0
 )
 
-if [[ "$found_docker_files" = false ]]; then
-  echo "[WARN] ⚠️ No docker secret files found"
-fi
-
 echo
 echo "=================================================="
 echo "[INFO] ✅ ENCRYPTION COMPLETE"
 echo "=================================================="
-echo

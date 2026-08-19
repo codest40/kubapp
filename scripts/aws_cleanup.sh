@@ -52,21 +52,22 @@ error() {
 usage() {
   cat <<EOF
 Usage:
-  $0 <resource-type> <resource-name>
+  $0 <resource-type> <resource-name-or-id>
 
 Resource Types:
-  ec2-instance
-  security-group
-  iam-role
-  iam-policy
-  s3-bucket
-  log-group
-  acm-cert
-  route53-zone
-  ecr-repo
-  load-balancer
-  target-group
-  launch-template
+  ec2-instance      EC2 Name tag
+  security-group    Security Group name
+  iam-role          IAM role name
+  iam-policy        IAM policy name
+  s3-bucket         Bucket name
+  log-group         Log group name
+  acm-cert          Certificate ARN
+  route53-zone      Hosted zone name
+  ecr-repo          Repository name
+  load-balancer     Load balancer name
+  target-group      Target group name
+  launch-template   Launch template name
+  eni               Network Interface ID
 EOF
   exit 1
 }
@@ -81,7 +82,9 @@ delete_ec2_instance() {
   local instance_id
   instance_id=$(aws ec2 describe-instances \
     --region "$AWS_REGION" \
-    --filters "Name=tag:Name,Values=$RESOURCE_NAME" \
+    --filters \
+      "Name=tag:Name,Values=$RESOURCE_NAME" \
+      "Name=instance-state-name,Values=pending,running,stopping,stopped" \
     --query 'Reservations[].Instances[].InstanceId' \
     --output text)
 

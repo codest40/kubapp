@@ -1,406 +1,320 @@
-# GitHub Observability System (sys_monitor/github)
+# GitHub Exporter
 
-# ------------------------------------------------------------
-# 1. OVERVIEW
-# ------------------------------------------------------------
-The GitHub observability subsystem is an event-driven telemetry
-pipeline that transforms raw GitHub webhook activity into real-time
-operational intelligence.
+The `exporters/github/` directory contains the GitHub integration and SRE analysis component of SysMonitor.
 
-It tracks engineering signals such as:
+Its primary purpose is to receive events from GitHub, normalize and persist those events, process them into operational metrics, and expose those metrics to Prometheus.
 
-- Push activity
-- Pull request flow
-- Workflow execution health
-- Job-level reliability
-- Issue activity
-- Release frequency
-- Lead time for changes
-- System anomalies and health scoring
+The exporter therefore provides both:
 
-At its core, the system converts:
+* **GitHub event visibility**
+* **SRE reliability analysis based on GitHub Actions workflow events**
 
-GitHub activity → SLI/SLO signals → Prometheus metrics → Grafana dashboards
+## What It Does
 
+The GitHub exporter receives GitHub webhook events through Flask.
 
-# ------------------------------------------------------------
-# 2. HIGH-LEVEL ARCHITECTURE
-# ------------------------------------------------------------
-The system is composed of four main layers:
+The events are normalized into internal event types and stored in a SQLite database. A background SRE worker then reads the stored events, calculates reliability signals, and exposes the resulting metrics through Prometheus.
 
+The main flow is:
 
-# ------------------------------------------------------------
-# 2.1 EVENT INGESTION LAYER (FLASK WEBHOOK API)
-# ------------------------------------------------------------
-GitHub sends events via webhook to:
-
-POST /webhook/github
-
-Handled by:
-
-src/routes/github.py
-
-Responsibilities:
-
-- Accept GitHub webhook payloads
-- Normalize event types into internal canonical format
-- Extract repository metadata
-- Publish events into durable storage (SQLite event bus)
-
-Key design decision:
-
-Webhook ingestion is stateless.
-All state is delegated to the event store.
-
-
-# ------------------------------------------------------------
-# 2.2 EVENT STORAGE LAYER (SQLITE EVENT BUS)
-# ------------------------------------------------------------
-File:
-src/stream/event_bus.py
-
-This is the source of truth for all GitHub events.
-
-It implements:
-
-- Append-only event persistence
-- Replay capability (consume_all)
-- Time-window querying (query_events_since)
-
-Schema:
-
-- event_type
-- repo
-- payload (JSON)
-- timestamp
-
-Design intent:
-
-Treat GitHub activity as an event stream, not a request/response log.
-
-This enables:
-
-- SLO recomputation
-- Historical replay
-- Failure recovery in worker loops
-
-
-# ------------------------------------------------------------
-# 2.3 PROCESSING + SLO ENGINE (WORKER LOOP)
-# ------------------------------------------------------------
-File:
-src/sre_engine/worker.py
-
-This is the core intelligence loop of the system.
-
-It runs continuously:
-
-- start_http_server(8000)
-- while True:
-    - query_events_since(window)
-    - compute metrics
-    - update Prometheus
-    - sleep(5s)
-
-
-# A. EVENT CLASSIFICATION → METRICS
-# ------------------------------------------------------------
-GitHub events are converted into Prometheus counters:
-
-- Pushes → github_push_total
-- PRs → github_pr_total
-- Issues → github_issue_total
-- Workflow runs → github_workflow_run_total
-- Jobs → github_workflow_job_total
-
-This establishes raw observability signals.
-
-
-# B. SLI COMPUTATION (CORE RELIABILITY SIGNAL)
-# ------------------------------------------------------------
-Workflow success is treated as the primary SLI:
-
-sli = success_count / total_workflow_events
-
-Derived metrics:
-
-- Error rate = 1 - SLI
-- Burn rate = error_rate / allowed_budget
-- Remaining budget = 1 - SLO_TARGET - error_rate
-
-This transforms CI/CD activity into SRE-grade reliability metrics.
-
-
-# C. HEALTH SCORING LAYER
-# ------------------------------------------------------------
-File:
-src/metrics/health.py
-
-Outputs:
-
-Health Score (0–100)
-
-- base = sli * 100
-- penalty applied when burn_rate > 1.0
-
-Interpretation:
-
-- High SLI → high health score
-- Burn rate violation → score penalty
-
-
-Anomaly Detection:
-
-- sli < 0.90
-- OR burn_rate > 1.0
-
-Output:
-
-- github_anomaly_flag
-
-
-# ------------------------------------------------------------
-# 2.4 METRICS EXPOSURE LAYER (PROMETHEUS)
-# ------------------------------------------------------------
-File:
-src/app.py
-
-Exposes:
-
-/metrics
-
-Using:
-
-prometheus_client.generate_latest()
-
-All counters and gauges become scrapeable Prometheus metrics.
-
-
-# ------------------------------------------------------------
-# 3. METRICS MODEL
-# ------------------------------------------------------------
-The system tracks multiple layers of GitHub behavior:
-
-
-# ------------------------------------------------------------
-# 3.1 DEVELOPER ACTIVITY METRICS
-# ------------------------------------------------------------
-- github_push_total
-- github_pr_total
-- github_issue_total
-
-Represents engineering throughput.
-
-
-# ------------------------------------------------------------
-# 3.2 CI/CD RELIABILITY METRICS
-# ------------------------------------------------------------
-- github_workflow_run_total
-- github_workflow_job_total
-- github_workflow_duration_seconds
-
-Represents delivery system health.
-
-
-# ------------------------------------------------------------
-# 3.3 RELEASE ENGINEERING METRICS
-# ------------------------------------------------------------
-- github_release_total
-- github_change_lead_time_seconds
-
-Represents DORA-style performance signals.
-
-
-# ------------------------------------------------------------
-# 3.4 SRE LAYER METRICS
-# ------------------------------------------------------------
-- slo_success_rate
-- error_budget_burn_rate
-- error_budget_remaining
-
-Represents SLO governance signals.
-
-
-# ------------------------------------------------------------
-# 3.5 DERIVED INTELLIGENCE METRICS
-# ------------------------------------------------------------
-- github_health_score
-- github_anomaly_flag
-
-Represents higher-order system intelligence.
-
-
-# ------------------------------------------------------------
-# 4. EVENT NORMALIZATION STRATEGY
-# ------------------------------------------------------------
-Located in:
-
-src/routes/github.py
-
-All GitHub events are normalized into canonical types:
-
-Workflow events:
-- workflow_run_success
-- workflow_run_failure
-
-Job events:
-- workflow_job_in_progress
-- workflow_job_completed
-
-Issues:
-- issues_open
-- issues_closed
-
-Design principle:
-
-Downstream systems never interpret raw GitHub semantics.
-
-This ensures:
-
-- SLO correctness
-- Consistent aggregation
-- Reduced event ambiguity
-
-
-# ------------------------------------------------------------
-# 5. GRAFANA OBSERVABILITY LAYER
-# ------------------------------------------------------------
-Dashboard:
-observability/grafana/dashboards/github-overview.json
-
-
-# 5.1 ENGINEERING ACTIVITY
-# ------------------------------------------------------------
-- Push event rate
-- PR event rate
-- Issue activity
-
-
-# 5.2 CI/CD RELIABILITY
-# ------------------------------------------------------------
-- Workflow runs
-- Workflow failures
-- Success rate
-
-
-# 5.3 PERFORMANCE ENGINEERING
-# ------------------------------------------------------------
-- Workflow duration
-- Lead time for changes
-- Deployment frequency
-
-
-# 5.4 JOB-LEVEL OBSERVABILITY
-# ------------------------------------------------------------
-- Job execution rate
-- Job failures
-- Breakdown by job name
-
-
-# 5.5 SYSTEM INTELLIGENCE
-# ------------------------------------------------------------
-- Health score gauge (0–100)
-- Anomaly detection flag
-
-
-# ------------------------------------------------------------
-# 6. SLO DESIGN PHILOSOPHY
-# ------------------------------------------------------------
-This system treats GitHub as a production system, not just a
-developer tool.
-
-Primary SLO:
-
-Workflow Success Rate ≥ 95%
-
-Everything derives from this:
-
-- error budget tracking
-- burn rate calculation
-- anomaly detection
-- health scoring
-
-Aligned with SRE principles (simplified burn-rate model).
-
-
-# ------------------------------------------------------------
-# 7. KEY DESIGN DECISIONS
-# ------------------------------------------------------------
-
-
-# 7.1 SQLITE AS EVENT STORE
-# ------------------------------------------------------------
-Pros:
-- Simple replay model
-- No external dependency
-- Deterministic state reconstruction
-
-Tradeoff:
-- Not horizontally scalable
-
-
-# 7.2 WORKER-BASED SLO COMPUTATION
-# ------------------------------------------------------------
-- Batch window: 5 minutes
-- Continuous recomputation loop
-
-Benefits:
-- Simplicity
-- Debuggability
-- SLO reproducibility
-
-
-# 7.3 PROMETHEUS AS SINGLE BACKEND
-# ------------------------------------------------------------
-No dual writing:
-
-- logs
-- tracing systems
-
-Everything flows:
-
-Prometheus → Grafana
-
-
-# 7.4 EVENT-DRIVEN DESIGN
-# ------------------------------------------------------------
-Instead of polling GitHub APIs:
-
-- System reacts to webhook events
-- Builds internal event stream
-
-Principle:
-
-“GitHub is a telemetry source, not a dependency.”
-
-
-# ------------------------------------------------------------
-# 8. END-TO-END FLOW
-# ------------------------------------------------------------
-GitHub Webhook
-      ↓
-Flask Ingestion Layer
-      ↓
+```text
+GitHub
+   │
+   │ Webhook
+   ▼
+Flask API
+   │
+   ▼
+Event Normalization
+   │
+   ▼
 SQLite Event Store
-      ↓
-Worker Loop (SLO Engine)
-      ↓
-Prometheus Metrics
-      ↓
-Grafana Dashboard
+   │
+   ▼
+SRE Worker
+   │
+   ├──► SLI
+   ├──► SLO
+   ├──► Error Budget
+   ├──► Burn Rate
+   ├──► Health Score
+   └──► Anomaly Detection
+             │
+             ▼
+       Prometheus Metrics
+```
 
+## Structure
 
-# ------------------------------------------------------------
-# 9. SUMMARY
-# ------------------------------------------------------------
-The GitHub subsystem in sys_monitor is a mini observability platform that:
+```text
+github/
+├── README.md
+├── requirements.txt
+└── src/
+    ├── app.py
+    │
+    ├── metrics/
+    │   ├── health.py
+    │   └── registry.py
+    │
+    ├── routes/
+    │   └── github.py
+    │
+    ├── sre_engine/
+    │   ├── __init__.py
+    │   ├── slo_engine.py
+    │   ├── slo_evaluator.py
+    │   ├── slo_policy.py
+    │   ├── slo_state.py
+    │   └── worker.py
+    │
+    └── stream/
+        ├── event_bus.py
+        └── event_types.py
+```
 
-- Treats GitHub as an event stream
-- Builds SRE-grade SLO computations
-- Converts engineering activity into reliability signals
-- Exposes everything via Prometheus
-- Visualizes system health via Grafana
+## Main Components
 
-At its core, it transforms:
+| Component                     | Responsibility                                                  |
+| ----------------------------- | --------------------------------------------------------------- |
+| `app.py`                      | Flask HTTP application and Prometheus metrics endpoint.         |
+| `routes/github.py`            | Receives and normalizes GitHub webhook events.                  |
+| `stream/event_types.py`       | Defines the internal GitHub event representation.               |
+| `stream/event_bus.py`         | Persists events in SQLite and retrieves historical events.      |
+| `metrics/registry.py`         | Defines GitHub and workflow Prometheus metrics.                 |
+| `metrics/health.py`           | Calculates health and anomaly signals.                          |
+| `sre_engine/worker.py`        | Processes historical events and calculates SLO-related metrics. |
+| `sre_engine/slo_policy.py`    | Defines the SLO contract and reliability target.                |
+| `sre_engine/slo_state.py`     | Maintains basic SLO state.                                      |
+| `sre_engine/slo_engine.py`    | Legacy SLO state implementation.                                |
+| `sre_engine/slo_evaluator.py` | Legacy SLO evaluation implementation.                           |
 
-GitHub activity logs → production-grade reliability telemetry system
+## HTTP Interface
+
+The Flask application provides the following endpoints:
+
+| Endpoint          | Purpose                                               |
+| ----------------- | ----------------------------------------------------- |
+| `/`               | Confirms that the GitHub exporter is running.         |
+| `/metrics`        | Exposes Prometheus metrics generated by the exporter. |
+| `/webhook/github` | Receives GitHub webhook events.                       |
+
+The webhook endpoint expects GitHub to provide the event type through the `X-GitHub-Event` header.
+
+## Event Processing
+
+Raw GitHub events are not used directly by the SRE engine.
+
+The exporter first converts them into canonical internal event types.
+
+Examples include:
+
+| GitHub Event                              | Internal Event             |
+| ----------------------------------------- | -------------------------- |
+| Successful `workflow_run`                 | `workflow_run_success`     |
+| Failed/cancelled/timed-out `workflow_run` | `workflow_run_failure`     |
+| Running workflow job                      | `workflow_job_in_progress` |
+| Completed workflow job                    | `workflow_job_completed`   |
+| Opened/reopened issue                     | `issues_open`              |
+| Closed issue                              | `issues_closed`            |
+| Pull request event                        | `pull_request`             |
+
+This normalization provides a consistent event model for downstream SRE processing.
+
+## Event Store
+
+The SQLite database is the event source of truth for the exporter.
+
+By default, the database is located at:
+
+```text
+/data/github_events.db
+```
+
+This can be changed with:
+
+```text
+EVENT_DB_PATH
+```
+
+Events are stored with:
+
+* Event type.
+* Repository.
+* Original GitHub payload.
+* Event timestamp.
+
+The event store allows the SRE worker to query historical events within a defined time window rather than depending only on the current webhook request.
+
+## Prometheus Metrics
+
+The exporter defines metrics for several categories of GitHub activity.
+
+### GitHub Activity
+
+Examples include:
+
+* Push events.
+* Pull request events.
+* Issue events.
+* Workflow runs.
+* Workflow jobs.
+* Releases.
+
+### Workflow Metrics
+
+The exporter tracks workflow execution using metrics such as:
+
+* Workflow run counts.
+* Workflow duration.
+* Workflow job counts.
+
+### SRE Metrics
+
+The exporter also exposes reliability signals including:
+
+* SLO success rate.
+* Error budget burn rate.
+* Remaining error budget.
+* GitHub health score.
+* GitHub anomaly flag.
+
+These metrics allow GitHub activity to become part of the wider SysMonitor observability model.
+
+## SRE Model
+
+The current SRE engine uses GitHub Actions workflow runs as its primary reliability signal.
+
+The default configuration is:
+
+| Setting           |         Value |
+| ----------------- | ------------: |
+| SLO target        |         `95%` |
+| Error budget      |          `5%` |
+| Evaluation window | `300 seconds` |
+| Worker interval   |   `5 seconds` |
+
+The workflow success rate is used as the SLI.
+
+```text
+Workflow Runs
+      │
+      ▼
+Success Rate
+      │
+      ▼
+Error Rate
+      │
+      ▼
+Error Budget Burn Rate
+      │
+      ├──► Health Score
+      │
+      └──► Anomaly Flag
+```
+
+## Health and Anomaly Detection
+
+The exporter derives a health score from the observed SLI and burn rate.
+
+The health score is bounded between `0` and `100`.
+
+An anomaly is currently detected when either:
+
+* SLI falls below `90%`
+* Error budget burn rate exceeds `1.0`
+
+These values are intended to provide a higher-level reliability signal rather than simply exposing raw GitHub events.
+
+## What It Expects
+
+The exporter expects the following to already exist:
+
+* A GitHub repository whose events will be monitored.
+* A GitHub webhook configured to send events to the exporter.
+* Network connectivity from GitHub to the webhook endpoint.
+* A writable location for the SQLite event database.
+* Prometheus if the metrics are to be scraped.
+* The Python dependencies defined in `requirements.txt`.
+
+The runtime also expects the required application directories and supporting modules to be available inside the exporter container/environment.
+
+## Configuration
+
+The main runtime configuration currently includes:
+
+| Variable         | Purpose                                 | Default                  |
+| ---------------- | --------------------------------------- | ------------------------ |
+| `EVENT_DB_PATH`  | SQLite event database location.         | `/data/github_events.db` |
+| `SLO_TARGET`     | Target success rate used by the worker. | `0.95`                   |
+| `WINDOW_SECONDS` | SRE evaluation window.                  | `300`                    |
+
+The SLO policy also defines the reliability contract through `SLOPolicy`.
+
+## Runtime Roles
+
+The GitHub exporter has two major runtime responsibilities.
+
+### Webhook/API Process
+
+The Flask application:
+
+1. Receives GitHub events.
+2. Identifies the event type.
+3. Extracts the repository.
+4. Normalizes the event.
+5. Persists the event.
+6. Returns a successful response to GitHub.
+
+### SRE Worker
+
+The worker:
+
+1. Reads events from SQLite.
+2. Evaluates workflow events.
+3. Calculates the SLI.
+4. Calculates the error rate.
+5. Calculates error-budget burn.
+6. Calculates remaining error budget.
+7. Calculates the health score.
+8. Detects anomalies.
+9. Updates Prometheus metrics.
+
+## Relationship With Prometheus
+
+Prometheus does not directly understand GitHub webhook events.
+
+The exporter provides the translation layer:
+
+```text
+GitHub
+   │
+   ▼
+Webhook
+   │
+   ▼
+GitHub Exporter
+   │
+   ├──► SQLite
+   │
+   └──► Prometheus Metrics
+              │
+              ▼
+          Prometheus
+              │
+              ▼
+            Grafana
+```
+
+This allows GitHub activity and GitHub Actions reliability to become observable alongside the other SysMonitor components.
+
+## Dependencies
+
+The Python dependencies are defined in `requirements.txt`.
+The current dependencies are:
+
+* Flask
+* prometheus_client
+* NumPy
+
+The exporter therefore runs as a Python/Flask service with Prometheus instrumentation.

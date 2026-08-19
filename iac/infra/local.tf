@@ -21,7 +21,7 @@ locals {
   common_tags = local.base_tags
 
   # ----------------------------
-  # App log groups (custom)
+  # App log groups
   # ----------------------------
   app_log_groups = {
     app_logs = {

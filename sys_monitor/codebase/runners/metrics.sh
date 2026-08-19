@@ -41,6 +41,11 @@ platform_health_count=0
 for file in "${EVIDENCE_DIR}"/*.json; do
     [[ ! -f "$file" ]] && continue
 
+    filename="$(basename "$file")"
+    # Historical filesystem snapshot.
+    # Used only by filesystem_drift.sh.
+    [[ "$filename" == *older* ]] && continue
+
     module=$(jq -r '.module // "unknown"' "$file" | tr '[:upper:]' '[:lower:]')
 
     status=$(jq -r '.status // "unknown"' "$file")
@@ -86,6 +91,144 @@ for file in "${EVIDENCE_DIR}"/*.json; do
           (.count|tostring)
     ' "$file" >> "$OUTPUT_FILE"
 
+
+    # ========================================================
+    # FILESYSTEM EVIDENCE
+    # ========================================================
+
+    if [[ "$filename" == "filesystem.json" || "$module" == "filesystem" ]]; then
+        filesystem_total=$(
+            jq '.files // {} | length' "$file"
+        )
+
+        emit \
+            "kubapp_filesystem_total ${filesystem_total}"
+    fi
+
+    # ========================================================
+    # FILESYSTEM DRIFT EVIDENCE
+    # ========================================================
+    if [[ "$filename" == "filesystem_drift.json" ]]; then
+        filesystem_modified=$(
+            jq '.modified // {} | length' "$file"
+        )
+
+        filesystem_removed=$(
+            jq '.removed // {} | length' "$file"
+        )
+
+        emit \
+            "kubapp_filesystem_drift_modified ${filesystem_modified}"
+
+        emit \
+            "kubapp_filesystem_drift_removed ${filesystem_removed}"
+
+        filesystem_size_changed=$(
+            jq '
+                [
+                    .modified[]?
+                    | select(
+                        .previous.size != .current.size
+                    )
+                ]
+                | length
+            ' "$file"
+            )
+
+        filesystem_permissions_changed=$(
+            jq '
+                [
+                    .modified[]?
+                    | select(
+                        .previous.permissions != .current.permissions
+                    )
+                ]
+                | length
+            ' "$file"
+        )
+
+        filesystem_uid_changed=$(
+            jq '
+                [
+                    .modified[]?
+                    | select(
+                        .previous.uid != .current.uid
+                    )
+                ]
+                | length
+            ' "$file"
+        )
+
+        filesystem_gid_changed=$(
+            jq '
+                [
+                    .modified[]?
+                    | select(
+                        .previous.gid != .current.gid
+                    )
+                ]
+                | length
+            ' "$file"
+        )
+
+        filesystem_access_changed=$(
+            jq '
+                [
+                    .modified[]?
+                    | select(
+                        .previous.access != .current.access
+                    )
+                ]
+                | length
+            ' "$file"
+        )
+
+        filesystem_modified_changed=$(
+            jq '
+                [
+                    .modified[]?
+                    | select(
+                        .previous.modified != .current.modified
+                    )
+                ]
+                | length
+            ' "$file"
+        )
+
+        filesystem_changed_changed=$(
+            jq '
+                [
+                    .modified[]?
+                    | select(
+                        .previous.changed != .current.changed
+                    )
+                ]
+                | length
+            ' "$file"
+        )
+
+        emit \
+            "kubapp_filesystem_size_changed ${filesystem_size_changed}"
+
+        emit \
+            "kubapp_filesystem_permissions_changed ${filesystem_permissions_changed}"
+
+        emit \
+            "kubapp_filesystem_uid_changed ${filesystem_uid_changed}"
+
+        emit \
+            "kubapp_filesystem_gid_changed ${filesystem_gid_changed}"
+
+        emit \
+            "kubapp_filesystem_access_changed ${filesystem_access_changed}"
+
+        emit \
+            "kubapp_filesystem_mtime_changed ${filesystem_modified_changed}"
+
+        emit \
+            "kubapp_filesystem_ctime_changed ${filesystem_changed_changed}"
+    fi
+
     # ========================================================
     # MODULE HEALTH SCORE
     # ========================================================
@@ -93,6 +236,14 @@ for file in "${EVIDENCE_DIR}"/*.json; do
     case "$module" in
 
         drift)
+            score=100
+            ;;
+
+        filesystem)
+            score=100
+            ;;
+
+        filesystem_drift)
             score=100
             ;;
 

@@ -162,7 +162,7 @@ aws elb describe-load-balancers \
   --query 'LoadBalancerDescriptions[].LoadBalancerName' \
   --output text |
 tr '\t' '\n' |
-grep -Ei "$CLUSTER_NAME|^k8s-" || true |
+{ grep -Ei "$CLUSTER_NAME|^k8s-" || true; } |
 while read -r name; do
   [[ -n "$name" ]] || continue
   log "Deleting classic ELB: $name"
@@ -429,10 +429,6 @@ if [[ -n "$VPC_ID" ]]; then
     --vpc-id "$VPC_ID" \
     --region "$REGION"
 fi
-
-# ============================================================
-# COMPLETE
-# ============================================================
 
 echo
 echo "=================================================="

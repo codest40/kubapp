@@ -1,256 +1,80 @@
-# sys_monitor — SYSTEM DESIGN
+# SysMonitor
 
-## A GitOps Observability Platform that converts GitHub activity into real-time metrics, health scoring, anomaly detection, and Grafana dashboards.
+SysMonitor is the internal system-awareness and observability layer of KubApp.
 
-# ------------------------------------------------------------
-# OVERVIEW
-# ------------------------------------------------------------
-sys_monitor is a self-contained observability and system intelligence subsystem designed to continuously inspect, validate, and reason about the state of infrastructure and runtime behavior.
+The key idea is:
 
-It operates as a local control plane for system introspection, combining:
+> **Kubernetes tells us what is happening to the platform externally. SysMonitor is intended to tell us what is happening inside the KubApp system itself.**
 
-- Infrastructure awareness (AWS test/prod simulation environments)
-- Runtime analysis (codebase runners)
-- Observability generation (metrics + evidence outputs)
-- Security and drift evaluation
-- Structural and architectural validation
+SysMonitor is designed to observe and analyze changes, activity, configuration, infrastructure, and operational state that may not be visible through Kubernetes, ArgoCD, or Terraform alone.
 
-Rather than acting as a passive monitoring tool, it behaves as an active system auditor that produces structured evidence about system health.
+It covers areas such as:
 
-# ------------------------------------------------------------
-# CORE DESIGN PHILOSOPHY
-# ------------------------------------------------------------
+- Files being created, modified, or deleted.
+- Scripts and configuration changes.
+- Unexpected changes to project files.
+- Infrastructure and deployment state.
+- GitHub activity.
+- GitOps activity.
+- Prometheus metrics and Grafana dashboards.
+- Internal system activity.
+- Eventually, correlation between changes, processes, users, events, and system state.
+- To a certain degree, external changes that affect the system.
 
-## 2.1 Evidence over Logs
-Instead of raw logs, sys_monitor produces structured outputs:
+## Project Structure
 
-- JSON evidence files
-- Metrics snapshots
-- Validation reports
+The root directory contains the major components of SysMonitor.
 
-This enables deterministic reasoning about system state.
+| Directory/File | Purpose |
+|---|---|
+| `cloud/` | Cloud infrastructure and AWS deployment automation. |
+| `codebase/` | Codebase discovery, validation, drift, architecture, security, and metrics analysis. |
+| `exporters/` | Exporters that collect and expose system-specific metrics and events. |
+| `observability/` | Prometheus and Grafana configuration for collecting and visualizing metrics. |
+| `docker-compose.yml` | Defines the local containerized SysMonitor stack. |
+| `README.md` | High-level documentation and entry point for the SysMonitor project. |
 
-## 2.2 Multi-Domain Observability
-Observability is not limited to metrics.
+## High-Level Flow
 
-It includes:
+SysMonitor is organized around several layers:
 
-- infrastructure state
-- security posture
-- architectural boundaries
-- runtime validation
-- drift between desired and actual state
+1. **Cloud**
+   - Provides the infrastructure required to run SysMonitor.
+   - Currently includes AWS/EC2 provisioning and deployment automation.
 
-## 2.3 Self-Auditing System Design
-The system continuously evaluates itself through runners:
+2. **Codebase**
+   - Examines the KubApp repository itself.
+   - Builds an inventory of the repository.
+   - Detects drift, security issues, architectural problems, and validation issues.
+   - Produces evidence and Prometheus metrics.
 
-"The system is both the subject and the observer."
+3. **Exporters**
+   - Collect operational events and expose them as metrics.
+   - Includes GitHub and GitOps-related exporters.
 
-# ------------------------------------------------------------
-# ARCHITECTURE
-# ------------------------------------------------------------
+4. **Observability**
+   - Prometheus collects metrics from the different exporters.
+   - Grafana provides dashboards for viewing the collected data.
 
-sys_monitor is structured into four tightly coupled subsystems:
+5. **Docker Compose**
+   - Connects the major SysMonitor services into a runnable local stack.
 
-# ------------------------------------------------------------
-# 3.1 Cloud Layer (cloud/)
-# ------------------------------------------------------------
-This layer simulates and provisions infrastructure environments.
+6. **Future AI Analysis Implementation**
 
-AWS Environment (cloud/aws):
+## What SysMonitor Is Intended to Provide
 
-- EC2 provisioning
-- VPC networking
-- Route53 configuration
-- TLS automation (start_letsencrypt.sh)
-- Bootstrapping scripts (start.sh, create_env.sh)
+The purpose of SysMonitor is NOT simply to monitor application availability.
+It is intended to provide **awareness of the system itself**.
 
-This layer represents the execution environment where workloads run.
+For example:
+- Is the codebase changing unexpectedly?
+- Has infrastructure configuration drifted?
+- Are security-sensitive files exposed?
+- Are repository structures violating expected architectural boundaries?
+- Are GitHub workflows succeeding?
+- Are GitOps operations healthy?
+- What metrics describe the current state of the system?
+- Can changes in the repository or infrastructure be correlated with operational events?
 
-Test Environment (cloud/test):
-
-- VPC setup (vpc.tf)
-- Internet gateway and routing
-- Public subnet configuration
-- Security group definitions
-- Single EC2 instance deployment
-
-This is primarily used for safe infrastructure behavior testing.
-
-# ------------------------------------------------------------
-# 3.2 Codebase Runners (codebase/runners/)
-# ------------------------------------------------------------
-This is the intelligence engine of sys_monitor.
-
-Each runner is a domain-specific analyzer responsible for producing structured system insights.
-
-architecture.sh
-- Detects architectural boundary violations
-- Ensures separation between system domains
-
-drift.sh
-- Compares desired vs actual infrastructure state
-- Produces drift evidence snapshots
-
-security.sh
-- Detects plaintext secrets, tfvars exposure, insecure patterns
-- Produces security findings report
-
-validation.sh
-- Validates codebase structure and syntax consistency
-- Enforces internal policy rules
-
-metrics.sh
-- Generates system telemetry signals
-
-discovery.sh
-- Builds full repository inventory map
-- Produces system-wide file and module index
-
-Each runner produces structured outputs stored in:
-
-codebase/evidence/
-
-# ------------------------------------------------------------
-# 3.3 Evidence Layer (codebase/evidence/)
-# ------------------------------------------------------------
-This is the core intelligence output system.
-
-It stores structured system snapshots:
-
-architecture.json
-- Architectural violations
-- Coupling and boundary issues
-- Structural integrity score
-
-drift.json
-- Infrastructure drift detection results
-- Desired vs actual state comparison
-
-security.json
-- Secret exposure detection
-- Misconfiguration findings
-- Security risk classification
-
-validation.json
-- Code validation results
-- Syntax and policy compliance
-- File type and schema correctness
-
-This layer transforms sys_monitor into a stateful reasoning system.
-
-# ------------------------------------------------------------
-# 3.4 Shared Libraries (codebase/lib/)
-# ------------------------------------------------------------
-Reusable utility layer used by all runners.
-
-json.sh
-- JSON escaping (json_escape)
-- Array serialization (json_array)
-- Boolean normalization (json_bool)
-- Error/warning serialization
-
-Ensures all runners produce consistent structured outputs.
-
-# ------------------------------------------------------------
-# DATA FLOW ARCHITECTURE
-# ------------------------------------------------------------
-
-Step 1: System State Collection
-- Cloud state (AWS/test infra)
-- Repository structure
-- Runtime environment signals
-
-Step 2: Runner Execution
-- architecture analysis
-- drift detection
-- security scanning
-- validation checks
-- metrics generation
-
-Step 3: Evidence Generation
-- Outputs written to codebase/evidence/
-
-Step 4: Aggregation
-Evidence files become the system of record and are consumed by:
-
-- dashboards (Grafana)
-- alerting rules (Prometheus)
-- operational scripts
-
-# ------------------------------------------------------------
-# OBSERVABILITY MODEL
-# ------------------------------------------------------------
-
-Metrics Layer
-- Prometheus metrics (metrics.prom)
-- Time-series system signals
-
-Evidence Layer
-- JSON-based structured system snapshots
-- Human + machine readable audit trail
-
-Visualization Layer
-- Grafana dashboards:
-  - codebase overview
-  - GitHub signals
-  - GitOps signals
-  - system health trends
-
-Resulting stack:
-
-- metrics (quantitative)
-- evidence (structured truth)
-- visualization (interpretation)
-
-# ------------------------------------------------------------
-# SECURITY MODEL
-# ------------------------------------------------------------
-Security is continuously evaluated as part of system observability.
-
-Detected patterns:
-
-- plaintext tfvars files
-- embedded credentials in scripts
-- secret misplacement in Kubernetes manifests
-- accidental credential exposure in automation scripts
-
-Output:
-
-codebase/evidence/security.json
-
-Security is treated as a continuously observable system state, not a periodic audit task.
-
-# ------------------------------------------------------------
-# CLOUD INTEGRATION MODEL
-# ------------------------------------------------------------
-
-7.1 AWS Production-like Layer
-- Realistic infrastructure provisioning
-- Networking, routing, TLS, EC2
-- Used for validating real-world behavior
-
-7.2 Test Simulation Layer
-- Minimal VPC + EC2 setup
-- Controlled environment for validation
-- Safe experimentation zone
-
-This separation ensures production behavior can be validated without risking real infrastructure.
-
-# ------------------------------------------------------------
-# OPERATIONAL LAYER (SCRIPTS)
-# ------------------------------------------------------------
-Shell scripts act as lightweight orchestration tools:
-
-- cluster lifecycle management
-- environment setup and teardown
-- validation execution
-- cleanup operations
-- Terraform execution wrappers
-
-This avoids heavy orchestration systems while maintaining:
-
-- reproducibility
-- automation
-- operational control
+This makes SysMonitor a complementary layer to the existing KubApp platform.
 

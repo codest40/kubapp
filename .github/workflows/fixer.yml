@@ -1,4 +1,4 @@
-name: KubApp Fix Something (for qick access and fixing via cicid)
+name: KubApp Fix Workflow
 
 on:
   workflow_dispatch:

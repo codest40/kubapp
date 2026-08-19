@@ -2,14 +2,14 @@
   "module": "architecture",
   "script": "architecture.sh",
   "status": "completed",
-  "timestamp": "2026-05-31T20:48:00Z",
+  "timestamp": "2026-08-19T09:42:49Z",
 
   "summary": {
-    "total_checked": 248,
-    "issues_found": 11,
+    "total_checked": 224,
+    "issues_found": 7,
     "critical": 0,
-    "warnings": 11,
-    "architecture_score": 67
+    "warnings": 7,
+    "architecture_score": 79
   },
 
   "findings": [
@@ -47,31 +47,7 @@
     "severity": "warning",
     "type": "duplication",
     "area": "scripts",
-    "message": "multiple find tools detected"
-  },
-  {
-    "severity": "warning",
-    "type": "duplication",
-    "area": "scripts",
     "message": "multiple validate tools detected"
-  },
-  {
-    "severity": "warning",
-    "type": "coupling",
-    "area": "scripts",
-    "message": "iac coupling detected"
-  },
-  {
-    "severity": "warning",
-    "type": "coupling",
-    "area": "scripts",
-    "message": "iac coupling detected"
-  },
-  {
-    "severity": "warning",
-    "type": "coupling",
-    "area": "scripts",
-    "message": "iac coupling detected"
   },
   {
     "severity": "warning",

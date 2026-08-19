@@ -1,20 +1,20 @@
 {
   "module": "validation",
   "script": "validation.sh",
-  "timestamp": "2026-05-31T20:48:04Z",
+  "timestamp": "2026-08-19T09:42:56Z",
   "status": "pass",
 
   "summary": {
-    "total_checked": 360,
+    "total_checked": 412,
     "critical": 0,
-    "warnings": 62,
-    "issues_found": 62,
+    "warnings": 124,
+    "issues_found": 124,
     "app_section_findings": 19,
     "helm_charts_checked": 10
   },
 
   "errors": 0,
-  "warnings": 62,
+  "warnings": 124,
 
   "findings": [
   {
@@ -188,6 +188,13 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
+    "file": "docs/n",
+    "message": "file not in whitelist or code registry",
+    "extra": ""
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
     "file": "docs/observability.md",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "md"
@@ -216,6 +223,48 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
+    "file": ".github/docs/add_new_app.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/architecture.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/artifacts.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/build.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/cleanup.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/deployment.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
     "file": ".github/docs/flow.md",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "md"
@@ -223,7 +272,63 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
+    "file": ".github/docs/ingress.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/operations.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
     "file": ".github/docs/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/reconciliation.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/registry.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/remove_service.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/rollback.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/stable_deploy.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": ".github/docs/verification.md",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "md"
   },
@@ -245,6 +350,13 @@
     "severity": "warning",
     "type": "unknown_file_type",
     "file": "gitops/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/boot/README.md",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "md"
   },
@@ -279,9 +391,9 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
-    "file": "iac/infra/envs/prod/infra.tfvars",
+    "file": "iac/infra/modules/acm/README.md",
     "message": "File type not validatable in line with KubApp policy",
-    "extra": "tfvars"
+    "extra": "md"
   },
   {
     "severity": "warning",
@@ -293,6 +405,13 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
+    "file": "iac/infra/modules/efs/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
     "file": "iac/infra/modules/eks/default_nodes",
     "message": "file not in whitelist or code registry",
     "extra": ""
@@ -300,7 +419,63 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
+    "file": "iac/infra/modules/eks/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/infra/modules/iam-core/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/infra/modules/iam-irsa/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/infra/modules/logging/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/infra/modules/network/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/infra/modules/security/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/infra/modules/sg-prep/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
     "file": "iac/infra/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/k8s/COMPONENTS.md",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "md"
   },
@@ -328,21 +503,7 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
-    "file": "iac/k8s/envs/prod/k8s.tfvars",
-    "message": "File type not validatable in line with KubApp policy",
-    "extra": "tfvars"
-  },
-  {
-    "severity": "warning",
-    "type": "unknown_file_type",
     "file": "iac/k8s/README.md",
-    "message": "File type not validatable in line with KubApp policy",
-    "extra": "md"
-  },
-  {
-    "severity": "warning",
-    "type": "unknown_file_type",
-    "file": "iac/k8s/R.md",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "md"
   },
@@ -352,6 +513,13 @@
     "file": "iac/manifests/envs/dev/manifests.tfvars",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "tfvars"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "iac/manifests/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
   },
   {
     "severity": "warning",
@@ -370,7 +538,231 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
-    "file": "scripts/docs/scripts_use.md",
+    "file": "scripts/docs/activate.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/apply_argo_secret.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/aws_cleanup.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/bootstrap_gitops.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/check_cluster.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/clean_cluster.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/clean_final.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/cleanup_logs.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/commit.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/create_secrets.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/create_values.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/del_argocd.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/delete_leftovers.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/drift_gitops.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/drift_state.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/encrypt_secrets.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/get_cert.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/get_state_file.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/postchecks.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/prechecks.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/promote.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/register_new_svc.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/remove_app.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/run_tf.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/setup_argocd.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/setup_sops.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/sync_route53.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/tag_stable_deploy.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/unlock_tf.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/validate_gitops.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/validate.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/validate_registry.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "scripts/docs/verify_cleanup.md",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "md"
   },
@@ -384,13 +776,6 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
-    "file": "scripts/R.md",
-    "message": "File type not validatable in line with KubApp policy",
-    "extra": "md"
-  },
-  {
-    "severity": "warning",
-    "type": "unknown_file_type",
     "file": "sys_monitor/cloud/aws/boot/terraform.tfvars",
     "message": "File type not validatable in line with KubApp policy",
     "extra": "tfvars"
@@ -398,9 +783,16 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
-    "file": "sys_monitor/cloud/aws/terraform.tfvars",
+    "file": "sys_monitor/cloud/aws/README.md",
     "message": "File type not validatable in line with KubApp policy",
-    "extra": "tfvars"
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "sys_monitor/cloud/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
   },
   {
     "severity": "warning",
@@ -426,9 +818,23 @@
   {
     "severity": "warning",
     "type": "unknown_file_type",
-    "file": "sys_monitor/docs/structure",
-    "message": "file not in whitelist or code registry",
-    "extra": ""
+    "file": "sys_monitor/docs/structure.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "sys_monitor/exporters/github/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "sys_monitor/exporters/gitops/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
   },
   {
     "severity": "warning",
@@ -436,6 +842,34 @@
     "file": "sys_monitor/exporters/gitops/src/k8s_client.py1",
     "message": "file not in whitelist or code registry",
     "extra": ""
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "sys_monitor/exporters/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "sys_monitor/observability/grafana/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "sys_monitor/observability/prometheus/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
+  },
+  {
+    "severity": "warning",
+    "type": "unknown_file_type",
+    "file": "sys_monitor/observability/README.md",
+    "message": "File type not validatable in line with KubApp policy",
+    "extra": "md"
   },
   {
     "severity": "warning",

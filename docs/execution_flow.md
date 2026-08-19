@@ -8,13 +8,9 @@
 
 # The execution model is:
 
-```bash
-   Terraform → Build → Registry → GitOps → ArgoCD
-        ↑        ↑                                ↑
-   Snapshot ← Verification ← Cluster ← Reconcile ←┘
-```
-
-```bash
+#   Terraform → Build → Registry → GitOps → ArgoCD
+#        ↑        ↑                                ↑
+#   Snapshot ← Verification ← Cluster ← Reconcile ←┘
 #
 1. Laptop push
       ↓
@@ -57,7 +53,7 @@
    - checks health
    - triggers rollback via Git tag switch
 
-```
+
 
 # Every stage is deterministic, reversible, and observable.
 
@@ -67,7 +63,7 @@
 # Terraform is the foundation layer.
 
 # ------------------------------------------------------------
-# 1. INFRASTRUCTURE BOOTSTRAP (TERRAFORM ORIGIN) iac/infra
+# 1. INFRASTRUCTURE BOOTSTRAP (TERRAFORM ORIGIN)
 # ------------------------------------------------------------
 
 # Everything begins with infrastructure provisioning.
@@ -94,7 +90,7 @@
 
 
 # ------------------------------------------------------------
-# 2. GITOPS CONTROL PLANE ACTIVATION (BOOTSTRAP PHASE)  iac/k8s + iac/manifests
+# 2. GITOPS CONTROL PLANE ACTIVATION (BOOTSTRAP PHASE)
 # ------------------------------------------------------------
 
 # Once the cluster exists, it is transformed into a GitOps system.
@@ -118,7 +114,7 @@
 
 
 # ------------------------------------------------------------
-# 3. APPLICATION BUILD PHASE (ARTIFACT GENERATION)   build.yml
+# 3. APPLICATION BUILD PHASE (ARTIFACT GENERATION)
 # ------------------------------------------------------------
 
 # The system now moves from infrastructure to workload creation.
@@ -176,7 +172,7 @@
 
 
 # ------------------------------------------------------------
-# 5. GITOPS MATERIALIZATION (HELM + CONFIG RENDERING)  add_new_app.yml
+# 5. GITOPS MATERIALIZATION (HELM + CONFIG RENDERING)
 # ------------------------------------------------------------
 
 # Registry entries are transformed into deployable manifests:
@@ -192,13 +188,15 @@
 
 # Important constraint:
 
+# This is still NOT deployment.
+
 # This is state compilation.
 
 # Git is updated → ArgoCD observes → Kubernetes will later converge
 
 
 # ------------------------------------------------------------
-# 6. RECONCILIATION ENGINE (ARGOCD ACTIVATION LOOP)   setup_argocd.yml
+# 6. RECONCILIATION ENGINE (ARGOCD ACTIVATION LOOP)
 # ------------------------------------------------------------
 
 # ArgoCD continuously watches:
@@ -229,7 +227,7 @@
 # The ingress layer enforces:
 
 # - every registered service must be routable
-# - no orphan routes are allowed (remove_svc.yml ensures that)
+# - no orphan routes are allowed
 # - registry is authoritative for traffic mapping
 
 # Validation outcomes:
