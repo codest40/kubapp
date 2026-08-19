@@ -1,0 +1,1 @@
+# All Scripts detailed explanations
